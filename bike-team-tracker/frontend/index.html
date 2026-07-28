@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>🚴 BikeTeam Tracker – Live Cycling Monitor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --panel: #16213e;
+      --card: #0f3460;
+      --accent: #e94560;
+      --accent2: #00d2ff;
+      --text: #e0e0e0;
+      --text-secondary: #a0a0b8;
+      --border: #2a2a4a;
+      --success: #2ecc71;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+      --sidebar-w: 320px;
+      --header-h: 52px;
+      --radius: 14px;
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --touch-target: 44px;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh; width: 100vw; overflow: hidden;
+      display: flex; flex-direction: column;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .header {
+      height: var(--header-h); background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 12px; gap: 8px;
+      z-index: 1000; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .header .logo { font-size: 1.3rem; font-weight: 700; white-space: nowrap; letter-spacing: -0.5px; }
+    .header .logo span { color: var(--accent2); }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%; background: var(--success);
+      flex-shrink: 0; animation: pulse-dot 1.8s infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(46,204,113,0.7); }
+      50% { box-shadow: 0 0 0 10px rgba(46,204,113,0); }
+    }
+    .status-text {
+      font-size: 0.7rem; color: var(--success); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;
+    }
+    .spacer { flex:1; }
+
+    .btn {
+      padding: 8px 14px; border-radius: 22px; border: none; cursor: pointer;
+      font-weight: 600; font-size: 0.8rem; letter-spacing: 0.3px;
+      transition: all 0.25s; white-space: nowrap; font-family: inherit;
+      display: inline-flex; align-items: center; gap: 4px;
+      min-height: var(--touch-target); background: transparent;
+    }
+    .btn-start { background: var(--success); color: #000; }
+    .btn-stop  { background: var(--danger); color: #fff; }
+    .btn:active { transform: scale(0.96); }
+    .btn-outline { border: 2px solid var(--border); color: var(--text); background: transparent; }
+    .btn-outline:active { border-color: var(--accent2); color: var(--accent2); }
+    .btn-sm { padding: 6px 10px; font-size: 0.7rem; }
+
+    .main-container { display: flex; flex:1; overflow: hidden; position: relative; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: var(--sidebar-w); background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto;
+      z-index: 500; flex-shrink: 0;
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      -webkit-overflow-scrolling: touch;
+    }
+    .sidebar.hidden {
+      transform: translateX(-100%);
+      position: absolute; height: 100%; top:0; left:0;
+      box-shadow: var(--shadow);
+    }
+    .sidebar-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .sidebar-section h3 {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.2px;
+      color: var(--text-secondary); margin-bottom: 8px; font-weight: 700;
+    }
+    .my-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 10px 12px; text-align: center;
+      border: 1px solid transparent; transition: border-color 0.3s;
+    }
+    .stat-card:active { border-color: var(--accent2); }
+    .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--accent2); }
+    .stat-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 2px; }
+    .team-list { display: flex; flex-direction: column; gap: 6px; }
+    .member-card {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--card); border-radius: var(--radius);
+      padding: 10px 12px; cursor: pointer; transition: all 0.25s;
+      border: 2px solid transparent; min-height: 56px;
+    }
+    .member-card:active { background: #1a3a6e; }
+    .member-card.you { border-color: var(--accent2); box-shadow: 0 0 15px rgba(0,210,255,0.2); }
+    .member-card.offline { opacity: 0.5; }
+    .member-dot {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .member-info { flex:1; min-width:0; }
+    .member-name { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .member-details { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 8px; }
+    .member-status { font-size: 0.6rem; padding: 3px 7px; border-radius: 10px; font-weight: 600; }
+    .status-active { background: rgba(46,204,113,0.2); color: var(--success); }
+    .status-inactive { background: rgba(243,156,18,0.2); color: var(--warning); }
+    .badge-you { background: var(--accent2); color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
+
+    .map-container { flex:1; position: relative; z-index: 100; }
+    #map { width:100%; height:100%; background:#1a2a3a; }
+
+    .map-btn {
+      position: absolute; z-index: 600; width: var(--touch-target);
+      height: var(--touch-target); border-radius: 50%;
+      background: var(--panel); border: 1px solid var(--border);
+      color: var(--text); font-size: 1.3rem; display: flex;
+      align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: var(--shadow);
+      transition: all 0.25s; backdrop-filter: blur(10px);
+    }
+    .map-btn:active { border-color: var(--accent2); color: var(--accent2); transform: scale(0.95); }
+    .toggle-sidebar { top: 10px; left: 10px; }
+    .follow-btn { bottom: 100px; right: 14px; }
+    .locate-btn { bottom: 44px; right: 14px; }
+    .manual-btn { bottom: 156px; right: 14px; }
+
+    .floating-panel {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 600; background: var(--panel); border-radius: 28px;
+      padding: 8px 18px; display: flex; gap: 16px; align-items: center;
+      box-shadow: var(--shadow); border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+    .floating-panel .mini-stat { text-align: center; }
+    .floating-panel .mini-val { font-weight: 700; font-size: 0.95rem; color: var(--accent2); }
+    .floating-panel .mini-lbl { font-size: 0.55rem; color: var(--text-secondary); text-transform: uppercase; }
+
+    .toast {
+      position: fixed; top: 65px; right: 15px; z-index: 9999;
+      background: var(--card); border: 1px solid var(--accent2);
+      border-radius: var(--radius); padding: 10px 16px;
+      color: var(--text); font-weight: 600; font-size: 0.8rem;
+      animation: slideIn 0.4s ease, slideOut 0.4s ease 2.8s forwards;
+      box-shadow: var(--shadow); max-width: 280px;
+    }
+    @keyframes slideIn { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes slideOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(120%); opacity:0; } }
+
+    @media (max-width: 768px) {
+      :root { --header-h: 48px; --sidebar-w: 280px; }
+      .header { padding: 0 8px; gap: 6px; }
+      .header .logo { font-size: 1.1rem; }
+      .btn { padding: 7px 11px; font-size: 0.72rem; min-height: 38px; }
+      .sidebar { position: absolute; top:0; left:0; height:100%; width: var(--sidebar-w); }
+      .sidebar:not(.hidden) { transform: translateX(0); }
+      .sidebar.hidden { transform: translateX(-100%); }
+      .toggle-sidebar { top: 8px; left: 8px; width: 40px; height: 40px; }
+      .floating-panel { bottom: 10px; padding: 6px 14px; gap: 12px; border-radius: 24px; }
+      .map-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+    }
+
+    @media (max-width: 480px) {
+      :root { --header-h: 44px; --sidebar-w: 260px; }
+      .header .logo { font-size: 1rem; }
+      .stat-card { padding: 8px 10px; }
+      .stat-value { font-size: 1.2rem; }
+      .member-card { padding: 8px 10px; gap: 8px; }
+      .member-dot { width: 32px; height: 32px; font-size: 1.1rem; }
+    }
+
+    .leaflet-div-icon { background: transparent !important; border: none !important; }
+    .custom-marker {
+      display: flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px; border-radius: 50%;
+      font-size: 1.6rem; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+      transition: transform 0.15s; cursor: pointer;
+    }
+    .custom-marker.you-marker {
+      animation: bounce-marker 0.6s ease infinite alternate;
+      font-size: 2rem; width: 50px; height: 50px;
+    }
+    @keyframes bounce-marker {
+      from { transform: translateY(0); } to { transform: translateY(-5px); }
+    }
+    .marker-label {
+      position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); color: #fff; padding: 2px 7px;
+      border-radius: 8px; font-size: 0.6rem; font-weight: 700;
+      white-space: nowrap; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <span style="font-size:1.4rem;">🚴</span>
+    <span class="logo">Bike<span>Team</span></span>
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">READY</span>
+    <span class="spacer"></span>
+    <button class="btn btn-start" id="btnStart">▶ Start</button>
+    <button class="btn btn-stop" id="btnStop" style="display:none;">⏹ Stop</button>
+    <button class="btn btn-outline btn-sm" id="btnDemo">👥 Demo</button>
+  </header>
+
+  <div class="main-container">
+    <aside class="sidebar hidden" id="sidebar">
+      <div class="sidebar-section">
+        <h3>📊 My Ride</h3>
+        <div class="my-stats">
+          <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
+          <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
+          <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
+          <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
+          <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
+            style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
+                   padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
+        </div>
+        <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
+          📍 Set manual location
+        </button>
+      </div>
+      <div class="sidebar-section" style="flex:1;">
+        <h3>👥 Team</h3>
+        <div class="team-list" id="teamList"></div>
+      </div>
+    </aside>
+
+    <div class="map-container">
+      <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
+      <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
+      <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
+      <button class="map-btn manual-btn" id="manualBtn" title="Set manual location">✏️</button>
+      <div id="map"></div>
+      <div class="floating-panel" id="floatingPanel">
+        <div class="mini-stat"><div class="mini-val" id="miniSpeed">0.0</div><div class="mini-lbl">km/h</div></div>
+        <div class="mini-stat"><div class="mini-val" id="miniDist">0.00</div><div class="mini-lbl">km</div></div>
+        <div class="mini-stat"><div class="mini-val" id="miniTime">00:00</div><div class="mini-lbl">time</div></div>
+      </div>
+    </div>
+  </div>
+  <div id="toastContainer"></div>
+
+  <script>
+    (function() {
+      // ── CONFIG ──────────────────────────────
+      const WS_URL = 'wss://your-backend.onrender.com'; // 🔁 CHANGE THIS after deploying the relay
+      const UPDATE_INTERVAL_MS = 1500;
+      const STALE_THRESHOLD_MS = 20000;
+      const DEMO_UPDATE_INTERVAL_MS = 1000;
+      const MAX_TRAIL_POINTS = 300;
+      const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
+
+      // ── STATE ──────────────────────────────
+      const myUserId = 'user_' + Math.random().toString(36).substring(2,10);
+      const myColor = USER_COLORS[Math.floor(Math.random()*USER_COLORS.length)];
+      let myName = localStorage.getItem('biketeam_myname') || 'Me';
+      let isTracking = false, trackStartTime = null, myLastPosition = null;
+      let myTotalDistance = 0, myRoutePoints = [], myCurrentSpeed = 0, myCurrentAltitude = null;
+      let geoWatchId = null;
+      let useManualLocation = false;
+
+      const remoteUsers = {};
+      const demoUsers = {};
+      let demoModeEnabled = true;
+      let demoReferencePoint = null;
+
+      let map, followMode = true;
+      const markerLayerGroup = L.layerGroup();
+      const trailLayerGroup = L.layerGroup();
+      const demoMarkerLayerGroup = L.layerGroup();
+      const demoTrailLayerGroup = L.layerGroup();
+      let userMarker = null, userTrailPolyline = null;
+
+      // ── WEBSOCKET ──────────────────────────
+      let socket;
+      function connectWebSocket() {
+        socket = new WebSocket(WS_URL);
+        socket.onopen = () => {
+          console.log('WebSocket connected');
+          broadcastMyPosition();
+        };
+        socket.onmessage = (e) => handleIncomingMessage(e.data);
+        socket.onclose = () => {
+          console.log('WS closed – reconnecting in 3s');
+          setTimeout(connectWebSocket, 3000);
+        };
+      }
+      connectWebSocket();
+
+      // ── DOM REFS ──────────────────────────
+      const $btnStart = document.getElementById('btnStart');
+      const $btnStop = document.getElementById('btnStop');
+      const $btnDemo = document.getElementById('btnDemo');
+      const $statusDot = document.getElementById('statusDot');
+      const $statusText = document.getElementById('statusText');
+      const $myNameInput = document.getElementById('myNameInput');
+      const $teamList = document.getElementById('teamList');
+      const $sidebar = document.getElementById('sidebar');
+      const $toggleSidebar = document.getElementById('toggleSidebar');
+      const $toastContainer = document.getElementById('toastContainer');
+      const $followBtn = document.getElementById('followBtn');
+      const $locateBtn = document.getElementById('locateBtn');
+      const $btnManualLocation = document.getElementById('btnManualLocation');
+      const $manualBtn = document.getElementById('manualBtn');
+
+      const $mySpeed = document.getElementById('mySpeed');
+      const $myDistance = document.getElementById('myDistance');
+      const $myElapsed = document.getElementById('myElapsed');
+      const $myAltitude = document.getElementById('myAltitude');
+      const $miniSpeed = document.getElementById('miniSpeed');
+      const $miniDist = document.getElementById('miniDist');
+      const $miniTime = document.getElementById('miniTime');
+
+      // ── INIT MAP ──────────────────────────
+      function initMap() {
+        map = L.map('map', {
+          center: [40.7128, -74.006], zoom: 14,
+          zoomControl: false, attributionControl: true,
+        });
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap', maxZoom: 19,
+        }).addTo(map);
+        markerLayerGroup.addTo(map);
+        trailLayerGroup.addTo(map);
+        demoMarkerLayerGroup.addTo(map);
+        demoTrailLayerGroup.addTo(map);
+
+        map.on('dragstart', () => { followMode = false; });
+        map.on('dblclick', () => {
+          followMode = true;
+          if(myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), {animate:true});
+        });
+      }
+
+      // ── GEOLOCATION ────────────────────────
+      function startGeolocation() {
+        if(useManualLocation) return false;
+        if (!navigator.geolocation) {
+          showToast('⚠️ Geolocation not supported');
+          return false;
+        }
+        geoWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const {latitude:lat, longitude:lng, speed, heading, altitude} = pos.coords;
+            const speedKmh = speed != null ? speed*3.6 : 0;
+            myCurrentSpeed = speedKmh;
+            myCurrentAltitude = altitude;
+            const newPos = {lat, lng, speed: speedKmh, heading, altitude, timestamp: Date.now()};
+            if(myLastPosition && isTracking) {
+              const dist = haversineDistance(myLastPosition.lat, myLastPosition.lng, lat, lng);
+              if(dist < 0.5) myTotalDistance += dist;
+            }
+            if(isTracking) {
+              myRoutePoints.push([lat, lng]);
+              if(myRoutePoints.length > MAX_TRAIL_POINTS) myRoutePoints.shift();
+            }
+            myLastPosition = newPos;
+            if(!demoReferencePoint) { demoReferencePoint = {lat, lng}; initDemoUsers(); }
+            updateMyStats(); updateMyMarker(); updateMyTrail(); broadcastMyPosition();
+            if(followMode) map.setView([lat, lng], map.getZoom(), {animate:true, duration:0.8});
+            updateStatusIndicator(true);
+          },
+          (err) => {
+            updateStatusIndicator(false);
+            let msg = 'GPS Error';
+            if(err.code===1) msg='Location permission denied';
+            else if(err.code===2) msg='Position unavailable';
+            else if(err.code===3) msg='GPS timeout';
+            $statusText.textContent=msg; $statusDot.style.background='var(--danger)';
+            showToast(`⚠️ ${msg}. Use manual location or enable GPS.`);
+            if(!demoReferencePoint && !myLastPosition) {
+              demoReferencePoint={lat:40.7128,lng:-74.006}; initDemoUsers(); map.setView([40.7128,-74.006],14);
+            }
+          },
+          { enableHighAccuracy:true, timeout:15000, maximumAge:2000 }
+        );
+        return true;
+      }
+
+      function stopGeolocation() {
+        if(geoWatchId!=null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+      }
+
+      function updateStatusIndicator(active) {
+        if(active) {
+          $statusDot.style.background='var(--success)'; $statusDot.style.animation='pulse-dot 1.8s infinite';
+          $statusText.textContent = isTracking ? 'LIVE' : 'CONNECTED';
+          $statusText.style.color = isTracking ? 'var(--success)' : 'var(--accent2)';
+        } else {
+          $statusDot.style.background='var(--warning)'; $statusDot.style.animation='none';
+        }
+      }
+
+      // ── MANUAL LOCATION ────────────────────
+      function setManualLocation(lat, lng) {
+        stopGeolocation();
+        useManualLocation = true;
+        myLastPosition = { lat, lng, speed: 0, heading: null, altitude: null, timestamp: Date.now() };
+        myCurrentSpeed = 0; myCurrentAltitude = null;
+        if(!demoReferencePoint) { demoReferencePoint = {lat, lng}; initDemoUsers(); }
+        updateMyStats(); updateMyMarker(); broadcastMyPosition();
+        map.setView([lat, lng], 15, {animate:true});
+        $statusText.textContent = 'MANUAL'; $statusText.style.color = 'var(--accent2)';
+        $statusDot.style.background = 'var(--accent2)'; $statusDot.style.animation = 'none';
+        showToast(`📍 Location set to ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      }
+
+      function promptManualLocation() {
+        const lat = prompt('Enter latitude (e.g., 40.7128):', myLastPosition ? myLastPosition.lat.toFixed(5) : '40.7128');
+        if(lat === null) return;
+        const lng = prompt('Enter longitude (e.g., -74.0060):', myLastPosition ? myLastPosition.lng.toFixed(5) : '-74.0060');
+        if(lng === null) return;
+        const latNum = parseFloat(lat), lngNum = parseFloat(lng);
+        if(isNaN(latNum) || isNaN(lngNum)) {
+          alert('Invalid coordinates.');
+          return;
+        }
+        setManualLocation(latNum, lngNum);
+      }
+
+      // ── HELPERS ────────────────────────────
+      function haversineDistance(lat1,lon1,lat2,lon2) {
+        const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
+        const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      }
+
+      function createCustomIcon(emoji, color, isYou=false) {
+        const size = isYou?50:40; const fontSize = isYou?'2rem':'1.5rem';
+        return L.divIcon({
+          html: `<div class="custom-marker${isYou?' you-marker':''}" style="background:${color};width:${size}px;height:${size}px;font-size:${fontSize};">${emoji}</div>`,
+          className:'', iconSize:[size,size+20], iconAnchor:[size/2,size/2+10], popupAnchor:[0,-size/2]
+        });
+      }
+
+      function updateMyMarker() {
+        if(!myLastPosition) return;
+        const {lat,lng}=myLastPosition;
+        if(!userMarker) {
+          userMarker = L.marker([lat,lng], {icon:createCustomIcon('🚴',myColor,true), zIndexOffset:1000}).addTo(markerLayerGroup);
+          userMarker.bindPopup(`<b>${escapeHtml(myName)}</b> (You)`);
+        } else userMarker.setLatLng([lat,lng]);
+        userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+      }
+
+      function updateMyTrail() {
+        if(myRoutePoints.length<2) return;
+        if(userTrailPolyline) userTrailPolyline.setLatLngs(myRoutePoints);
+        else userTrailPolyline = L.polyline(myRoutePoints, {color:myColor, weight:4, opacity:0.7}).addTo(trailLayerGroup);
+      }
+
+      // ── BROADCAST (WebSocket) ──────────────
+      function broadcastMyPosition() {
+        if (!myLastPosition || !socket || socket.readyState !== WebSocket.OPEN) return;
+        const msg = JSON.stringify({
+          type: 'location_update',
+          userId: myUserId,
+          userName: myName,
+          lat: myLastPosition.lat,
+          lng: myLastPosition.lng,
+          speed: myCurrentSpeed,
+          heading: myLastPosition.heading,
+          altitude: myCurrentAltitude,
+          color: myColor,
+          timestamp: Date.now(),
+          isTracking,
+        });
+        socket.send(msg);
+      }
+
+      function handleIncomingMessage(jsonStr) {
+        let data; try { data=JSON.parse(jsonStr); } catch(e){ return; }
+        if(data.type!=='location_update' || data.userId===myUserId) return;
+        const prev = remoteUsers[data.userId];
+        const now = {
+          userId: data.userId,
+          userName: data.userName || 'Rider',
+          lat: data.lat,
+          lng: data.lng,
+          speed: data.speed || 0,
+          heading: data.heading,
+          altitude: data.altitude,
+          color: data.color || '#888',
+          timestamp: data.timestamp,
+          lastSeen: Date.now(),
+          isTracking: data.isTracking,
+          routePoints: prev ? prev.routePoints : [],
+        };
+        if (now.isTracking && prev && prev.lat !== now.lat && prev.lng !== now.lng) {
+          now.routePoints.push([now.lat, now.lng]);
+          if (now.routePoints.length > MAX_TRAIL_POINTS) now.routePoints.shift();
+        } else if (!prev) {
+          now.routePoints = [[now.lat, now.lng]];
+        }
+        remoteUsers[data.userId] = now;
+        updateRemoteMarkers();
+        updateTeamList();
+      }
+
+      // Stale user cleanup
+      setInterval(() => {
+        const now = Date.now();
+        for (const uid in remoteUsers) {
+          if (now - remoteUsers[uid].lastSeen > STALE_THRESHOLD_MS) {
+            remoteUsers[uid].isTracking = false;
+          }
+        }
+        updateTeamList();
+        updateRemoteMarkers();
+      }, 5000);
+
+      function updateRemoteMarkers() {
+        for (const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          const { lat, lng, color, userName } = u;
+          const active = (Date.now() - u.lastSeen) < STALE_THRESHOLD_MS;
+          if (!u._marker) {
+            u._marker = L.marker([lat, lng], {
+              icon: createCustomIcon('🚴‍♂️', color, false),
+              zIndexOffset: 500,
+              opacity: active ? 1 : 0.5,
+            }).addTo(markerLayerGroup);
+            u._marker.bindPopup(`<b>${escapeHtml(userName)}</b><br>Speed: ${(u.speed||0).toFixed(1)} km/h`);
+          } else {
+            u._marker.setLatLng([lat, lng]);
+            u._marker.setOpacity(active ? 1 : 0.5);
+            u._marker.setPopupContent(`<b>${escapeHtml(userName)}</b><br>Speed: ${(u.speed||0).toFixed(1)} km/h<br>${active ? '🟢 Active' : '🟠 Away'}`);
+          }
+          if (u.routePoints.length >= 2) {
+            if (!u._trail) {
+              u._trail = L.polyline(u.routePoints, {
+                color: color,
+                weight: 3,
+                opacity: 0.5,
+                dashArray: '6 4',
+              }).addTo(trailLayerGroup);
+            } else {
+              u._trail.setLatLngs(u.routePoints);
+            }
+            u._trail.setStyle({ opacity: active ? 0.5 : 0.2 });
+          }
+        }
+      }
+
+      // ── DEMO RIDERS ────────────────────────
+      const DEMO_USER_DEFS = [
+        {id:'demo_1',name:'Alex',emoji:'🚴',color:'#ff6b6b',baseSpeed:22,ampLat:0.008,ampLng:0.010,phase:0,period:180},
+        {id:'demo_2',name:'Sam',emoji:'🚴‍♀️',color:'#ffd93d',baseSpeed:18,ampLat:0.006,ampLng:0.012,phase:1.2,period:220},
+        {id:'demo_3',name:'Jordan',emoji:'🚴',color:'#6bcb77',baseSpeed:26,ampLat:0.010,ampLng:0.007,phase:2.5,period:160},
+        {id:'demo_4',name:'Riley',emoji:'🚴‍♀️',color:'#845ef7',baseSpeed:20,ampLat:0.009,ampLng:0.009,phase:4.0,period:200}
+      ];
+
+      function initDemoUsers() {
+        if(!demoReferencePoint) return;
+        for(const d of DEMO_USER_DEFS) {
+          if(!demoUsers[d.id]) {
+            demoUsers[d.id] = {
+              ...d,
+              lat: demoReferencePoint.lat + d.ampLat * Math.sin(d.phase),
+              lng: demoReferencePoint.lng + d.ampLng * Math.cos(d.phase),
+              speed: d.baseSpeed + (Math.random()-0.5)*6,
+              routePoints: [],
+              _marker: null,
+              _trail: null,
+            };
+          }
+        }
+        updateDemoMarkers();
+        updateTeamList();
+      }
+
+      function updateDemoPositions() {
+        if(!demoReferencePoint || !demoModeEnabled) return;
+        const t = Date.now() / 1000;
+        for(const d of DEMO_USER_DEFS) {
+          const du = demoUsers[d.id];
+          if(!du) continue;
+          const ang = (2*Math.PI)/d.period * t + d.phase;
+          const nLat = demoReferencePoint.lat + d.ampLat * Math.sin(ang);
+          const nLng = demoReferencePoint.lng + d.ampLng * Math.cos(ang);
+          const speed = d.baseSpeed + Math.sin(t*0.7+d.phase)*4;
+          if(du.lat && du.lng) {
+            const dist = haversineDistance(du.lat, du.lng, nLat, nLng);
+            if(dist < 0.3) {
+              du.routePoints.push([nLat, nLng]);
+              if(du.routePoints.length > MAX_TRAIL_POINTS) du.routePoints.shift();
+            }
+          }
+          du.lat = nLat;
+          du.lng = nLng;
+          du.speed = Math.max(5, speed);
+          if(du.routePoints.length === 0) du.routePoints = [[nLat, nLng]];
+        }
+        updateDemoMarkers();
+        updateTeamList();
+      }
+
+      function updateDemoMarkers() {
+        if(!demoModeEnabled) {
+          for(const uid in demoUsers) {
+            if(demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
+            if(demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
+            demoUsers[uid]._marker = null;
+            demoUsers[uid]._trail = null;
+          }
+          return;
+        }
+        for(const uid in demoUsers) {
+          const du = demoUsers[uid];
+          if(!du.lat || !du.lng) continue;
+          if(!du._marker) {
+            du._marker = L.marker([du.lat, du.lng], {
+              icon: createCustomIcon(du.emoji, du.color, false),
+              zIndexOffset: 300,
+            }).addTo(demoMarkerLayerGroup);
+            du._marker.bindPopup(`<b>${escapeHtml(du.name)}</b> (Demo)<br>Speed: ${du.speed.toFixed(1)} km/h`);
+          } else {
+            du._marker.setLatLng([du.lat, du.lng]);
+            du._marker.setPopupContent(`<b>${escapeHtml(du.name)}</b> (Demo)<br>Speed: ${du.speed.toFixed(1)} km/h`);
+          }
+          if(du.routePoints.length >= 2) {
+            if(!du._trail) {
+              du._trail = L.polyline(du.routePoints, {
+                color: du.color,
+                weight: 2.5,
+                opacity: 0.4,
+                dashArray: '8 6',
+              }).addTo(demoTrailLayerGroup);
+            } else {
+              du._trail.setLatLngs(du.routePoints);
+            }
+          }
+        }
+      }
+
+      setInterval(updateDemoPositions, DEMO_UPDATE_INTERVAL_MS);
+
+      // ── UI UPDATES ────────────────────────
+      function updateMyStats() {
+        const dist = myTotalDistance;
+        let elapsed = 0;
+        if(isTracking && trackStartTime) elapsed = (Date.now() - trackStartTime) / 1000;
+        const elapsedStr = formatDuration(elapsed);
+        const altStr = myCurrentAltitude != null ? Math.round(myCurrentAltitude) : '--';
+        $mySpeed.textContent = myCurrentSpeed.toFixed(1);
+        $myDistance.textContent = dist.toFixed(2);
+        $myElapsed.textContent = elapsedStr;
+        $myAltitude.textContent = altStr;
+        $miniSpeed.textContent = myCurrentSpeed.toFixed(1);
+        $miniDist.textContent = dist.toFixed(2);
+        $miniTime.textContent = elapsedStr;
+      }
+
+      function formatDuration(sec) {
+        const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+        return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      }
+
+      function updateTeamList() {
+        const members = [];
+        members.push({
+          id: myUserId, name: myName, color: myColor,
+          speed: myCurrentSpeed, distance: myTotalDistance,
+          isYou: true, isActive: isTracking || useManualLocation, isTracking, emoji: '🚴'
+        });
+        for(const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          const active = (Date.now() - u.lastSeen) < STALE_THRESHOLD_MS;
+          members.push({
+            id: uid, name: u.userName, color: u.color,
+            speed: u.speed || 0, distance: estimateRouteDistance(u.routePoints),
+            isYou: false, isActive: active && u.isTracking, isTracking: u.isTracking, emoji: '🚴‍♂️'
+          });
+        }
+        if(demoModeEnabled) {
+          for(const uid in demoUsers) {
+            const du = demoUsers[uid];
+            members.push({
+              id: uid, name: du.name, color: du.color,
+              speed: du.speed || 0, distance: estimateRouteDistance(du.routePoints),
+              isYou: false, isActive: true, isTracking: true, isDemo: true, emoji: du.emoji
+            });
+          }
+        }
+        if(members.length <= 1 && !demoModeEnabled) {
+          $teamList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders...</div>';
+        } else {
+          $teamList.innerHTML = members.map(m => `
+            <div class="member-card${m.isYou?' you':''}${!m.isActive&&!m.isDemo?' offline':''}" onclick="window.highlightUser('${m.id}')">
+              <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
+              <div class="member-info">
+                <div class="member-name">${escapeHtml(m.name)} ${m.isYou?'<span class="badge-you">YOU</span>':''} ${m.isDemo?'<span style="font-size:0.6rem;color:var(--text-secondary);">demo</span>':''}</div>
+                <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
+              </div>
+              <span class="member-status ${m.isActive?'status-active':'status-inactive'}">${m.isDemo?'SIM':m.isActive?'LIVE':'AWAY'}</span>
+            </div>
+          `).join('');
+        }
+      }
+
+      function estimateRouteDistance(pts) {
+        if(!pts || pts.length < 2) return 0;
+        let d = 0;
+        for(let i=1; i<pts.length; i++) d += haversineDistance(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+        return d;
+      }
+
+      window.highlightUser = function(uid) {
+        if(uid === myUserId && myLastPosition) {
+          map.setView([myLastPosition.lat, myLastPosition.lng], 16, {animate:true});
+          followMode = true;
+          return;
+        }
+        if(remoteUsers[uid]?.lat) {
+          map.setView([remoteUsers[uid].lat, remoteUsers[uid].lng], 16, {animate:true});
+          followMode = false;
+          return;
+        }
+        if(demoUsers[uid]?.lat) {
+          map.setView([demoUsers[uid].lat, demoUsers[uid].lng], 16, {animate:true});
+          followMode = false;
+        }
+      };
+
+      function startTracking() {
+        if(!myLastPosition) {
+          showToast('⚠️ No location yet. Wait for GPS or set manual location.');
+          return;
+        }
+        isTracking = true;
+        trackStartTime = Date.now();
+        myTotalDistance = 0;
+        myRoutePoints = [[myLastPosition.lat, myLastPosition.lng]];
+        if(userTrailPolyline) { trailLayerGroup.removeLayer(userTrailPolyline); userTrailPolyline = null; }
+        $btnStart.style.display = 'none';
+        $btnStop.style.display = 'inline-flex';
+        $statusText.textContent = 'LIVE';
+        $statusText.style.color = 'var(--success)';
+        updateMyStats();
+        updateTeamList();
+        broadcastMyPosition();
+        showToast('🚴 Ride started!');
+        if(myLastPosition) { map.setView([myLastPosition.lat, myLastPosition.lng], 15, {animate:true}); followMode = true; }
+      }
+
+      function stopTracking() {
+        isTracking = false;
+        trackStartTime = null;
+        $btnStart.style.display = 'inline-flex';
+        $btnStop.style.display = 'none';
+        $statusText.textContent = useManualLocation ? 'MANUAL' : 'CONNECTED';
+        $statusText.style.color = useManualLocation ? 'var(--accent2)' : 'var(--success)';
+        updateMyStats();
+        updateTeamList();
+        broadcastMyPosition();
+        showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
+      }
+
+      function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        $toastContainer.appendChild(toast);
+        setTimeout(() => { if(toast.parentNode) toast.remove(); }, 3000);
+      }
+
+      function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      // ── EVENT LISTENERS ──────────────────
+      $btnStart.addEventListener('click', startTracking);
+      $btnStop.addEventListener('click', stopTracking);
+
+      $btnDemo.addEventListener('click', () => {
+        demoModeEnabled = !demoModeEnabled;
+        if(demoModeEnabled) {
+          if(!demoReferencePoint) demoReferencePoint = myLastPosition ? {lat: myLastPosition.lat, lng: myLastPosition.lng} : {lat:40.7128, lng:-74.006};
+          initDemoUsers();
+        } else {
+          for(const uid in demoUsers) {
+            if(demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
+            if(demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
+            demoUsers[uid]._marker = null;
+            demoUsers[uid]._trail = null;
+          }
+        }
+        updateTeamList();
+      });
+
+      $toggleSidebar.addEventListener('click', () => {
+        $sidebar.classList.toggle('hidden');
+        if (window.innerWidth <= 768) {
+          $sidebar.style.transform = $sidebar.classList.contains('hidden') ? 'translateX(-100%)' : 'translateX(0)';
+        }
+      });
+
+      $followBtn.addEventListener('click', () => {
+        followMode = true;
+        if(myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), {animate:true});
+        showToast('📍 Following you');
+      });
+
+      $locateBtn.addEventListener('click', () => {
+        if(myLastPosition) {
+          map.setView([myLastPosition.lat, myLastPosition.lng], 16, {animate:true});
+          followMode = true;
+        } else {
+          showToast('⏳ No position yet');
+        }
+      });
+
+      $btnManualLocation.addEventListener('click', promptManualLocation);
+      $manualBtn.addEventListener('click', promptManualLocation);
+
+      $myNameInput.addEventListener('input', () => {
+        myName = $myNameInput.value.trim() || 'Me';
+        localStorage.setItem('biketeam_myname', myName);
+        updateTeamList();
+        broadcastMyPosition();
+        if(userMarker) userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'f' && document.activeElement === document.body) { $followBtn.click(); }
+        if(e.key === 's' && document.activeElement === document.body) { if(!isTracking) startTracking(); else stopTracking(); }
+        if(e.key === 'd' && document.activeElement === document.body) { $btnDemo.click(); }
+      });
+
+      window.addEventListener('resize', () => {
+        if(window.innerWidth > 768) {
+          $sidebar.style.transform = '';
+        } else {
+          $sidebar.style.transform = $sidebar.classList.contains('hidden') ? 'translateX(-100%)' : 'translateX(0)';
+        }
+      });
+
+      // Periodic broadcast & remote cleanup
+      setInterval(() => {
+        broadcastMyPosition();
+        updateRemoteMarkers();
+      }, UPDATE_INTERVAL_MS);
+
+      // ── INIT ──────────────────────────────
+      function init() {
+        initMap();
+        $myNameInput.value = myName;
+        if (window.innerWidth <= 768) {
+          $sidebar.classList.add('hidden');
+          $sidebar.style.transform = 'translateX(-100%)';
+        } else {
+          $sidebar.classList.remove('hidden');
+        }
+        const geoStarted = startGeolocation();
+        if(!geoStarted && !useManualLocation) {
+          if(!myLastPosition) {
+            demoReferencePoint = {lat:40.7128, lng:-74.006};
+            initDemoUsers();
+            map.setView([40.7128, -74.006], 14);
+            $statusText.textContent = 'NO GPS';
+            $statusDot.style.background = 'var(--warning)';
+            $statusDot.style.animation = 'none';
+          }
+        }
+        setTimeout(() => {
+          if(!demoReferencePoint && myLastPosition) demoReferencePoint = {lat: myLastPosition.lat, lng: myLastPosition.lng};
+          if(!demoReferencePoint) demoReferencePoint = {lat:40.7128, lng:-74.006};
+          initDemoUsers();
+          updateTeamList();
+        }, 2000);
+        updateTeamList();
+        setInterval(updateMyStats, 1000);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
