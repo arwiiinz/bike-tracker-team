@@ -1,12 +1,14 @@
-const CACHE_NAME = 'biketeam-v1';
+const CACHE_NAME = 'biketeam-v2'; // Changed version to force update
+
+// List all files that MUST be cached for the app to work
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json'
-  // If you have other CSS or JS files, add them here
+  // Add other files like CSS or JS if they are external, but they are inline here.
 ];
 
-// Install the service worker
+// Install event - cache the core files
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -14,24 +16,26 @@ self.addEventListener('install', event => {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
+      .then(() => self.skipWaiting()) // Forces the new SW to activate immediately
   );
 });
 
-// Fetch files from cache
+// Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Cache hit - return response
+        // Cache hit - return the cached version
         if (response) {
           return response;
         }
+        // Otherwise, fetch from network
         return fetch(event.request);
       })
   );
 });
 
-// Activate and clean up old caches
+// Activate event - clean up old caches
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
@@ -43,6 +47,6 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // Takes control of all pages immediately
   );
 });
