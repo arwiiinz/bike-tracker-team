@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🚴 BikeTeam Tracker – Live Cycling Monitor</title>
-  <!-- Leaflet CSS & JS -->
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Firebase SDK -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
@@ -128,7 +128,7 @@
     .member-details { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 8px; }
     .member-status { font-size: 0.6rem; padding: 3px 7px; border-radius: 10px; font-weight: 600; }
     .status-active { background: rgba(46,204,113,0.2); color: var(--success); }
-    .status-inactive { background: rgba(243,156,18,0.2); color: var(--warning); }
+    .status-inactive { background: rgba(243,156,12,0.2); color: var(--warning); }
     .badge-you { background: var(--accent2); color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
 
     .map-container { flex:1; position: relative; z-index: 100; }
@@ -270,7 +270,7 @@
   <script>
     (function() {
       // ============================================================
-      // 1. FIREBASE CONFIG – PASTE YOUR OWN CONFIG HERE
+      // 1. 🔥 FIREBASE CONFIG – PASTE YOUR OWN CONFIG HERE
       // ============================================================
       const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
@@ -286,7 +286,7 @@
       const database = firebase.database();
 
       // ============================================================
-      // 2. CONSTANTS & STATE
+      // 2. STATE – each device gets a UNIQUE ID
       // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
@@ -294,7 +294,7 @@
       const MAX_TRAIL_POINTS = 300;
       const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
 
-      // Generate a unique ID – you can also prompt for a name
+      // 🔑 Unique per browser/device – never clashes with another rider
       const myUserId = 'user_' + Math.random().toString(36).substring(2,10);
       let myName = localStorage.getItem('biketeam_myname') || 'Me';
       const myColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
@@ -309,15 +309,11 @@
       let geoWatchId = null;
       let useManualLocation = false;
 
-      // Remote riders (from Firebase)
       const remoteUsers = {};
-
-      // Demo riders (simulated)
       let demoModeEnabled = true;
       let demoReferencePoint = null;
       const demoUsers = {};
 
-      // Map stuff
       let map;
       let followMode = true;
       const markerLayerGroup = L.layerGroup();
@@ -328,7 +324,7 @@
       let userTrailPolyline = null;
 
       // ============================================================
-      // 3. FIREBASE HELPERS
+      // 3. FIREBASE SYNC – separate record per user
       // ============================================================
       const myLocationRef = database.ref('locations/' + myUserId);
 
@@ -344,32 +340,34 @@
           color: myColor,
           timestamp: Date.now(),
           isTracking: isTracking,
-          routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS) // store trail
+          routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS)
         };
         myLocationRef.set(data);
       }
 
-      // Listen for all riders
+      // 👇 LISTEN to ALL other riders live
       const locationsRef = database.ref('locations');
       locationsRef.on('child_added', (snapshot) => {
-        const data = snapshot.val();
-        if (snapshot.key === myUserId) return; // skip self
-        remoteUsers[snapshot.key] = data;
+        if (snapshot.key === myUserId) return;
+        remoteUsers[snapshot.key] = snapshot.val();
         updateRemoteMarkers();
         updateTeamList();
+        console.log('➕ Rider added:', snapshot.key);
       });
 
       locationsRef.on('child_changed', (snapshot) => {
-        const data = snapshot.val();
         if (snapshot.key === myUserId) return;
-        remoteUsers[snapshot.key] = data;
+        if (remoteUsers[snapshot.key]) {
+          remoteUsers[snapshot.key] = { ...remoteUsers[snapshot.key], ...snapshot.val() };
+        } else {
+          remoteUsers[snapshot.key] = snapshot.val();
+        }
         updateRemoteMarkers();
         updateTeamList();
+        console.log('🔄 Rider updated:', snapshot.key);
       });
 
       locationsRef.on('child_removed', (snapshot) => {
-        delete remoteUsers[snapshot.key];
-        // remove marker and trail
         const uid = snapshot.key;
         if (remoteUsers[uid] && remoteUsers[uid]._marker) {
           markerLayerGroup.removeLayer(remoteUsers[uid]._marker);
@@ -377,25 +375,29 @@
         }
         delete remoteUsers[uid];
         updateTeamList();
+        console.log('❌ Rider removed:', uid);
       });
 
-      // Clean up stale riders (every 10s)
+      // Mark stale riders offline
       setInterval(() => {
         const now = Date.now();
         for (const uid in remoteUsers) {
-          if (now - (remoteUsers[uid].timestamp || 0) > STALE_THRESHOLD_MS) {
-            // remove from map but keep in list as offline
-            remoteUsers[uid]._offline = true;
-          } else {
-            remoteUsers[uid]._offline = false;
+          const u = remoteUsers[uid];
+          const stale = (now - (u.timestamp || 0)) > STALE_THRESHOLD_MS;
+          if (stale && !u._offline) {
+            u._offline = true;
+            updateRemoteMarkers();
+            updateTeamList();
+          } else if (!stale && u._offline) {
+            u._offline = false;
+            updateRemoteMarkers();
+            updateTeamList();
           }
         }
-        updateRemoteMarkers();
-        updateTeamList();
-      }, 10000);
+      }, 5000);
 
       // ============================================================
-      // 4. MAP INITIALIZATION
+      // 4. MAP
       // ============================================================
       function initMap() {
         map = L.map('map', {
@@ -418,9 +420,7 @@
         map.on('dragstart', () => { followMode = false; });
         map.on('dblclick', () => {
           followMode = true;
-          if (myLastPosition) {
-            map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
-          }
+          if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
         });
       }
 
@@ -443,7 +443,7 @@
 
             if (myLastPosition && isTracking) {
               const dist = haversineDistance(myLastPosition.lat, myLastPosition.lng, lat, lng);
-              if (dist > 0.01) myTotalDistance += dist; // ignore noise
+              if (dist > 0.01) myTotalDistance += dist;
             }
             if (isTracking) {
               myRoutePoints.push([lat, lng]);
@@ -451,7 +451,6 @@
             }
             myLastPosition = newPos;
 
-            // Set demo reference if not set
             if (!demoReferencePoint) {
               demoReferencePoint = { lat, lng };
               initDemoUsers();
@@ -614,7 +613,6 @@
               `<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
             );
           }
-          // Trail
           if (u.routePoints && u.routePoints.length >= 2) {
             if (!u._trail) {
               u._trail = L.polyline(u.routePoints, {
@@ -632,7 +630,7 @@
       }
 
       // ============================================================
-      // 8. DEMO RIDERS
+      // 8. DEMO RIDERS (optional)
       // ============================================================
       const DEMO_USER_DEFS = [
         { id: 'demo_1', name: 'Alex', emoji: '🚴', color: '#ff6b6b', baseSpeed: 22, ampLat: 0.008, ampLng: 0.010, phase: 0, period: 180 },
@@ -688,7 +686,6 @@
 
       function updateDemoMarkers() {
         if (!demoModeEnabled) {
-          // remove all demo markers and trails
           for (const uid in demoUsers) {
             if (demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
             if (demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
@@ -763,7 +760,6 @@
 
       function updateTeamList() {
         const members = [];
-        // Self
         members.push({
           id: myUserId,
           name: myName,
@@ -775,7 +771,6 @@
           isTracking: isTracking,
           emoji: '🚴'
         });
-        // Remote
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
@@ -791,7 +786,6 @@
             emoji: '🚴‍♂️'
           });
         }
-        // Demo
         if (demoModeEnabled) {
           for (const uid in demoUsers) {
             const du = demoUsers[uid];
@@ -996,11 +990,9 @@
         }
       });
 
-      // Periodic broadcast
+      // Periodically broadcast (ensures fresh data even if GPS is slow)
       setInterval(() => {
-        if (myLastPosition) {
-          broadcastMyPosition();
-        }
+        if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
       // ============================================================
@@ -1016,10 +1008,8 @@
           $sidebar.classList.remove('hidden');
         }
 
-        // Try GPS
         const geoStarted = startGeolocation();
         if (!geoStarted && !useManualLocation) {
-          // fallback: start with demo
           if (!myLastPosition) {
             demoReferencePoint = { lat: 40.7128, lng: -74.006 };
             initDemoUsers();
@@ -1030,7 +1020,6 @@
           }
         }
 
-        // Ensure demo reference is set after a moment
         setTimeout(() => {
           if (!demoReferencePoint && myLastPosition) {
             demoReferencePoint = { lat: myLastPosition.lat, lng: myLastPosition.lng };
@@ -1044,6 +1033,7 @@
 
         updateTeamList();
         setInterval(updateMyStats, 1000);
+        console.log('✅ BikeTeam started. Your ID:', myUserId);
       }
 
       init();
