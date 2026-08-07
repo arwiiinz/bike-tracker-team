@@ -271,14 +271,14 @@
   </div>
   <div id="toastContainer"></div>
 
-<script>
+  <script>
       (function() {
       // ============================================================
       // 1. 🔥 FIREBASE CONFIG (YOUR CONFIG)
       // ============================================================
       const firebaseConfig = {
         apiKey: "AIzaSyDQI0kkCJPNq-RYtzKhCEYS5sjQRcc5X0E",
-           databaseURL: "https://biketeamtracker-default-rtdb.asia-southeast1.firebasedatabase.app",
+        databaseURL: "https://biketeamtracker-default-rtdb.asia-southeast1.firebasedatabase.app",
         authDomain: "biketeamtracker.firebaseapp.com",
         projectId: "biketeamtracker",
         storageBucket: "biketeamtracker.firebasestorage.app",
@@ -296,14 +296,12 @@
       if (!teamCode) {
         teamCode = prompt('🔑 Enter Team Code (e.g., "Race1"):', 'Race1');
         if (teamCode) {
-          // Trim, make lowercase, replace spaces -> avoids "Race1" vs "race1" issues
           teamCode = teamCode.trim().toLowerCase().replace(/\s/g, '_');
           localStorage.setItem('biketeam_teamcode', teamCode);
         } else {
           teamCode = 'defaultteam';
         }
       } else {
-        // Ensure existing stored code is also lowercased for consistency
         teamCode = teamCode.trim().toLowerCase().replace(/\s/g, '_');
         localStorage.setItem('biketeam_teamcode', teamCode);
       }
@@ -342,7 +340,7 @@
       let userTrailPolyline = null;
 
       // ============================================================
-      // 4. FIREBASE SYNC – separated by TEAM CODE
+      // 4. FIREBASE SYNC
       // ============================================================
       const myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
 
@@ -361,7 +359,6 @@
           routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS)
         };
         
-        // 🔥 ADDED ERROR HANDLING! Now you'll know if Firebase blocks you.
         myLocationRef.set(data).catch((error) => {
           console.error('❌ Firebase write error:', error);
           showToast('❌ Firebase Error: ' + error.message, true);
@@ -371,7 +368,6 @@
         });
       }
 
-      // 👇 Listen ONLY to users in the SAME team code
       const locationsRef = database.ref('teams/' + teamCode);
       locationsRef.on('child_added', (snapshot) => {
         if (snapshot.key === myUserId) return;
@@ -402,7 +398,6 @@
         updateTeamList();
       });
 
-      // Mark stale riders offline
       setInterval(() => {
         const now = Date.now();
         let updated = false;
@@ -446,6 +441,14 @@
         map.on('dblclick', () => {
           followMode = true;
           if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
+        });
+
+        // ✅ ADDED: Close sidebar on map click (mobile only)
+        map.on('click', () => {
+          if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
+            $sidebar.classList.add('hidden');
+            $sidebar.style.transform = 'translateX(-100%)';
+          }
         });
       }
 
@@ -679,7 +682,6 @@
 
       function updateTeamList() {
         const members = [];
-        // Self
         members.push({
           id: myUserId,
           name: myName,
@@ -691,7 +693,6 @@
           isTracking: isTracking,
           emoji: '🚴'
         });
-        // Remote
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
@@ -708,8 +709,7 @@
           });
         }
 
-        // Update count
-        document.getElementById('teamCount').textContent = members.length - 1; // exclude self
+        document.getElementById('teamCount').textContent = members.length - 1;
 
         if (members.length <= 1) {
           $teamList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders in "' + teamCode + '"...</div>';
@@ -797,7 +797,7 @@
       }
 
       // ============================================================
-      // 11. TEST FIREBASE CONNECTION BUTTON
+      // 11. TEST FIREBASE CONNECTION
       // ============================================================
       function testFirebaseConnection() {
         const testRef = database.ref('teams/' + teamCode + '/_test');
@@ -807,7 +807,7 @@
           device: myUserId
         }).then(() => {
           showToast('✅ Firebase Connection: SUCCESS!');
-          testRef.remove(); // clean up
+          testRef.remove();
         }).catch((error) => {
           showToast('❌ Firebase ERROR: ' + error.message, true);
           alert('🔥 FIREBASE BLOCKED!\n\n' + error.message + '\n\nSOLUTION:\n1. Go to Firebase Console -> Realtime Database -> Rules\n2. Set rules to:\n{ "rules": { ".read": true, ".write": true } }\n3. Click Publish.');
@@ -843,30 +843,26 @@
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
+      // Toggle sidebar (☰)
       $toggleSidebar.addEventListener('click', () => {
-        // 1. Close button inside the sidebar (the ✕ icon)
-          const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
-          if ($closeSidebarBtn) {
-            $closeSidebarBtn.addEventListener('click', () => {
-              $sidebar.classList.add('hidden');
-              if (window.innerWidth <= 768) {
-                $sidebar.style.transform = 'translateX(-100%)';
-              }
-            });
-          }
-
-          // 2. Tap on the map to close the sidebar (on mobile)
-          map.on('click', () => {
-            if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
-              $sidebar.classList.add('hidden');
-              $sidebar.style.transform = 'translateX(-100%)';
-            }
-          });
         $sidebar.classList.toggle('hidden');
         if (window.innerWidth <= 768) {
           $sidebar.style.transform = $sidebar.classList.contains('hidden') ? 'translateX(-100%)' : 'translateX(0)';
         }
       });
+
+      // Close sidebar (✕)
+      const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
+      if ($closeSidebarBtn) {
+        $closeSidebarBtn.addEventListener('click', () => {
+          $sidebar.classList.add('hidden');
+          if (window.innerWidth <= 768) {
+            $sidebar.style.transform = 'translateX(-100%)';
+          }
+        });
+      }
+
+      // ⚠️ REMOVED the erroneous map.on('click') here – it's now inside initMap()
 
       $followBtn.addEventListener('click', () => {
         followMode = true;
@@ -918,7 +914,7 @@
       // 13. INIT
       // ============================================================
       function init() {
-        initMap();
+        initMap();  // ✅ This creates the map
         $myNameInput.value = myName;
         if (window.innerWidth <= 768) {
           $sidebar.classList.add('hidden');
@@ -944,6 +940,8 @@
         
         // Auto-test Firebase after 3 seconds
         setTimeout(testFirebaseConnection, 3000);
+        
+        // ✅ The map click listener is already inside initMap() – no need to add again here.
       }
 
       init();
