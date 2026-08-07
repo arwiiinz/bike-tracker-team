@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🚴 BikeTeam Tracker – Live Cycling Monitor</title>
+  <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     :root {
       --bg: #1a1a2e;
@@ -216,7 +220,7 @@
     <span style="font-size:1.4rem;">🚴</span>
     <span class="logo">Bike<span>Team</span></span>
     <div class="status-dot" id="statusDot"></div>
-    <span class="status-text" id="statusText">READY</span>
+    <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
     <button class="btn btn-start" id="btnStart">▶ Start</button>
     <button class="btn btn-stop" id="btnStop" style="display:none;">⏹ Stop</button>
@@ -265,52 +269,640 @@
 
   <script>
     (function() {
-      // ── CONFIG ──────────────────────────────
-      const WS_URL = 'wss://your-backend.onrender.com'; // 🔁 CHANGE THIS after deploying the relay
+      // ============================================================
+      // 1. FIREBASE CONFIG – PASTE YOUR OWN CONFIG HERE
+      // ============================================================
+      const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+
+      // ============================================================
+      // 2. CONSTANTS & STATE
+      // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
       const DEMO_UPDATE_INTERVAL_MS = 1000;
       const MAX_TRAIL_POINTS = 300;
       const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
 
-      // ── STATE ──────────────────────────────
+      // Generate a unique ID – you can also prompt for a name
       const myUserId = 'user_' + Math.random().toString(36).substring(2,10);
-      const myColor = USER_COLORS[Math.floor(Math.random()*USER_COLORS.length)];
       let myName = localStorage.getItem('biketeam_myname') || 'Me';
-      let isTracking = false, trackStartTime = null, myLastPosition = null;
-      let myTotalDistance = 0, myRoutePoints = [], myCurrentSpeed = 0, myCurrentAltitude = null;
+      const myColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
+
+      let isTracking = false;
+      let trackStartTime = null;
+      let myLastPosition = null;
+      let myTotalDistance = 0;
+      let myRoutePoints = [];
+      let myCurrentSpeed = 0;
+      let myCurrentAltitude = null;
       let geoWatchId = null;
       let useManualLocation = false;
 
+      // Remote riders (from Firebase)
       const remoteUsers = {};
-      const demoUsers = {};
+
+      // Demo riders (simulated)
       let demoModeEnabled = true;
       let demoReferencePoint = null;
+      const demoUsers = {};
 
-      let map, followMode = true;
+      // Map stuff
+      let map;
+      let followMode = true;
       const markerLayerGroup = L.layerGroup();
       const trailLayerGroup = L.layerGroup();
       const demoMarkerLayerGroup = L.layerGroup();
       const demoTrailLayerGroup = L.layerGroup();
-      let userMarker = null, userTrailPolyline = null;
+      let userMarker = null;
+      let userTrailPolyline = null;
 
-      // ── WEBSOCKET ──────────────────────────
-      let socket;
-      function connectWebSocket() {
-        socket = new WebSocket(WS_URL);
-        socket.onopen = () => {
-          console.log('WebSocket connected');
-          broadcastMyPosition();
+      // ============================================================
+      // 3. FIREBASE HELPERS
+      // ============================================================
+      const myLocationRef = database.ref('locations/' + myUserId);
+
+      function broadcastMyPosition() {
+        if (!myLastPosition) return;
+        const data = {
+          userId: myUserId,
+          userName: myName,
+          lat: myLastPosition.lat,
+          lng: myLastPosition.lng,
+          speed: myCurrentSpeed,
+          altitude: myCurrentAltitude,
+          color: myColor,
+          timestamp: Date.now(),
+          isTracking: isTracking,
+          routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS) // store trail
         };
-        socket.onmessage = (e) => handleIncomingMessage(e.data);
-        socket.onclose = () => {
-          console.log('WS closed – reconnecting in 3s');
-          setTimeout(connectWebSocket, 3000);
-        };
+        myLocationRef.set(data);
       }
-      connectWebSocket();
 
-      // ── DOM REFS ──────────────────────────
+      // Listen for all riders
+      const locationsRef = database.ref('locations');
+      locationsRef.on('child_added', (snapshot) => {
+        const data = snapshot.val();
+        if (snapshot.key === myUserId) return; // skip self
+        remoteUsers[snapshot.key] = data;
+        updateRemoteMarkers();
+        updateTeamList();
+      });
+
+      locationsRef.on('child_changed', (snapshot) => {
+        const data = snapshot.val();
+        if (snapshot.key === myUserId) return;
+        remoteUsers[snapshot.key] = data;
+        updateRemoteMarkers();
+        updateTeamList();
+      });
+
+      locationsRef.on('child_removed', (snapshot) => {
+        delete remoteUsers[snapshot.key];
+        // remove marker and trail
+        const uid = snapshot.key;
+        if (remoteUsers[uid] && remoteUsers[uid]._marker) {
+          markerLayerGroup.removeLayer(remoteUsers[uid]._marker);
+          if (remoteUsers[uid]._trail) trailLayerGroup.removeLayer(remoteUsers[uid]._trail);
+        }
+        delete remoteUsers[uid];
+        updateTeamList();
+      });
+
+      // Clean up stale riders (every 10s)
+      setInterval(() => {
+        const now = Date.now();
+        for (const uid in remoteUsers) {
+          if (now - (remoteUsers[uid].timestamp || 0) > STALE_THRESHOLD_MS) {
+            // remove from map but keep in list as offline
+            remoteUsers[uid]._offline = true;
+          } else {
+            remoteUsers[uid]._offline = false;
+          }
+        }
+        updateRemoteMarkers();
+        updateTeamList();
+      }, 10000);
+
+      // ============================================================
+      // 4. MAP INITIALIZATION
+      // ============================================================
+      function initMap() {
+        map = L.map('map', {
+          center: [40.7128, -74.006],
+          zoom: 14,
+          zoomControl: false,
+          attributionControl: true
+        });
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap',
+          maxZoom: 19
+        }).addTo(map);
+
+        markerLayerGroup.addTo(map);
+        trailLayerGroup.addTo(map);
+        demoMarkerLayerGroup.addTo(map);
+        demoTrailLayerGroup.addTo(map);
+
+        map.on('dragstart', () => { followMode = false; });
+        map.on('dblclick', () => {
+          followMode = true;
+          if (myLastPosition) {
+            map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
+          }
+        });
+      }
+
+      // ============================================================
+      // 5. GEOLOCATION
+      // ============================================================
+      function startGeolocation() {
+        if (useManualLocation) return false;
+        if (!navigator.geolocation) {
+          showToast('⚠️ Geolocation not supported');
+          return false;
+        }
+        geoWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const { latitude: lat, longitude: lng, speed, heading, altitude } = pos.coords;
+            const speedKmh = speed != null ? speed * 3.6 : 0;
+            myCurrentSpeed = speedKmh;
+            myCurrentAltitude = altitude;
+            const newPos = { lat, lng, speed: speedKmh, heading, altitude, timestamp: Date.now() };
+
+            if (myLastPosition && isTracking) {
+              const dist = haversineDistance(myLastPosition.lat, myLastPosition.lng, lat, lng);
+              if (dist > 0.01) myTotalDistance += dist; // ignore noise
+            }
+            if (isTracking) {
+              myRoutePoints.push([lat, lng]);
+              if (myRoutePoints.length > MAX_TRAIL_POINTS) myRoutePoints.shift();
+            }
+            myLastPosition = newPos;
+
+            // Set demo reference if not set
+            if (!demoReferencePoint) {
+              demoReferencePoint = { lat, lng };
+              initDemoUsers();
+            }
+
+            updateMyStats();
+            updateMyMarker();
+            updateMyTrail();
+            broadcastMyPosition();
+
+            if (followMode) {
+              map.setView([lat, lng], map.getZoom(), { animate: true, duration: 0.8 });
+            }
+            updateStatusIndicator(true);
+          },
+          (err) => {
+            updateStatusIndicator(false);
+            let msg = 'GPS Error';
+            if (err.code === 1) msg = 'Location permission denied';
+            else if (err.code === 2) msg = 'Position unavailable';
+            else if (err.code === 3) msg = 'GPS timeout';
+            $statusText.textContent = msg;
+            $statusDot.style.background = 'var(--danger)';
+            showToast(`⚠️ ${msg}. Use manual location or enable GPS.`);
+            if (!demoReferencePoint && !myLastPosition) {
+              demoReferencePoint = { lat: 40.7128, lng: -74.006 };
+              initDemoUsers();
+              map.setView([40.7128, -74.006], 14);
+            }
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+        );
+        return true;
+      }
+
+      function stopGeolocation() {
+        if (geoWatchId != null) {
+          navigator.geolocation.clearWatch(geoWatchId);
+          geoWatchId = null;
+        }
+      }
+
+      function updateStatusIndicator(active) {
+        if (active) {
+          $statusDot.style.background = 'var(--success)';
+          $statusDot.style.animation = 'pulse-dot 1.8s infinite';
+          $statusText.textContent = isTracking ? 'LIVE' : 'CONNECTED';
+          $statusText.style.color = isTracking ? 'var(--success)' : 'var(--accent2)';
+        } else {
+          $statusDot.style.background = 'var(--warning)';
+          $statusDot.style.animation = 'none';
+          $statusText.textContent = 'NO GPS';
+          $statusText.style.color = 'var(--warning)';
+        }
+      }
+
+      // ============================================================
+      // 6. MANUAL LOCATION
+      // ============================================================
+      function setManualLocation(lat, lng) {
+        stopGeolocation();
+        useManualLocation = true;
+        myLastPosition = { lat, lng, speed: 0, heading: null, altitude: null, timestamp: Date.now() };
+        myCurrentSpeed = 0;
+        myCurrentAltitude = null;
+        if (!demoReferencePoint) {
+          demoReferencePoint = { lat, lng };
+          initDemoUsers();
+        }
+        updateMyStats();
+        updateMyMarker();
+        broadcastMyPosition();
+        map.setView([lat, lng], 15, { animate: true });
+        $statusText.textContent = 'MANUAL';
+        $statusText.style.color = 'var(--accent2)';
+        $statusDot.style.background = 'var(--accent2)';
+        $statusDot.style.animation = 'none';
+        showToast(`📍 Location set to ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      }
+
+      function promptManualLocation() {
+        const lat = prompt('Enter latitude (e.g., 40.7128):', myLastPosition ? myLastPosition.lat.toFixed(5) : '40.7128');
+        if (lat === null) return;
+        const lng = prompt('Enter longitude (e.g., -74.0060):', myLastPosition ? myLastPosition.lng.toFixed(5) : '-74.0060');
+        if (lng === null) return;
+        const latNum = parseFloat(lat), lngNum = parseFloat(lng);
+        if (isNaN(latNum) || isNaN(lngNum)) {
+          alert('Invalid coordinates.');
+          return;
+        }
+        setManualLocation(latNum, lngNum);
+      }
+
+      // ============================================================
+      // 7. HELPERS
+      // ============================================================
+      function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      function createCustomIcon(emoji, color, isYou = false) {
+        const size = isYou ? 50 : 40;
+        const fontSize = isYou ? '2rem' : '1.5rem';
+        return L.divIcon({
+          html: `<div class="custom-marker${isYou ? ' you-marker' : ''}" style="background:${color};width:${size}px;height:${size}px;font-size:${fontSize};">${emoji}</div>`,
+          className: '',
+          iconSize: [size, size + 20],
+          iconAnchor: [size / 2, size / 2 + 10],
+          popupAnchor: [0, -size / 2]
+        });
+      }
+
+      function updateMyMarker() {
+        if (!myLastPosition) return;
+        const { lat, lng } = myLastPosition;
+        if (!userMarker) {
+          userMarker = L.marker([lat, lng], { icon: createCustomIcon('🚴', myColor, true), zIndexOffset: 1000 })
+            .addTo(markerLayerGroup);
+          userMarker.bindPopup(`<b>${escapeHtml(myName)}</b> (You)`);
+        } else {
+          userMarker.setLatLng([lat, lng]);
+        }
+        userMarker.setPopupContent(
+          `<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`
+        );
+      }
+
+      function updateMyTrail() {
+        if (myRoutePoints.length < 2) return;
+        if (userTrailPolyline) {
+          userTrailPolyline.setLatLngs(myRoutePoints);
+        } else {
+          userTrailPolyline = L.polyline(myRoutePoints, { color: myColor, weight: 4, opacity: 0.7 })
+            .addTo(trailLayerGroup);
+        }
+      }
+
+      function updateRemoteMarkers() {
+        for (const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          if (!u.lat || !u.lng) continue;
+          const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
+          if (!u._marker) {
+            u._marker = L.marker([u.lat, u.lng], {
+              icon: createCustomIcon('🚴‍♂️', u.color || '#888', false),
+              zIndexOffset: 500,
+              opacity: isOffline ? 0.5 : 1
+            }).addTo(markerLayerGroup);
+            u._marker.bindPopup(`<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h`);
+          } else {
+            u._marker.setLatLng([u.lat, u.lng]);
+            u._marker.setOpacity(isOffline ? 0.5 : 1);
+            u._marker.setPopupContent(
+              `<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
+            );
+          }
+          // Trail
+          if (u.routePoints && u.routePoints.length >= 2) {
+            if (!u._trail) {
+              u._trail = L.polyline(u.routePoints, {
+                color: u.color || '#888',
+                weight: 3,
+                opacity: 0.5,
+                dashArray: '6 4'
+              }).addTo(trailLayerGroup);
+            } else {
+              u._trail.setLatLngs(u.routePoints);
+            }
+            u._trail.setStyle({ opacity: isOffline ? 0.2 : 0.5 });
+          }
+        }
+      }
+
+      // ============================================================
+      // 8. DEMO RIDERS
+      // ============================================================
+      const DEMO_USER_DEFS = [
+        { id: 'demo_1', name: 'Alex', emoji: '🚴', color: '#ff6b6b', baseSpeed: 22, ampLat: 0.008, ampLng: 0.010, phase: 0, period: 180 },
+        { id: 'demo_2', name: 'Sam', emoji: '🚴‍♀️', color: '#ffd93d', baseSpeed: 18, ampLat: 0.006, ampLng: 0.012, phase: 1.2, period: 220 },
+        { id: 'demo_3', name: 'Jordan', emoji: '🚴', color: '#6bcb77', baseSpeed: 26, ampLat: 0.010, ampLng: 0.007, phase: 2.5, period: 160 },
+        { id: 'demo_4', name: 'Riley', emoji: '🚴‍♀️', color: '#845ef7', baseSpeed: 20, ampLat: 0.009, ampLng: 0.009, phase: 4.0, period: 200 }
+      ];
+
+      function initDemoUsers() {
+        if (!demoReferencePoint) return;
+        for (const d of DEMO_USER_DEFS) {
+          if (!demoUsers[d.id]) {
+            demoUsers[d.id] = {
+              ...d,
+              lat: demoReferencePoint.lat + d.ampLat * Math.sin(d.phase),
+              lng: demoReferencePoint.lng + d.ampLng * Math.cos(d.phase),
+              speed: d.baseSpeed + (Math.random() - 0.5) * 6,
+              routePoints: [],
+              _marker: null,
+              _trail: null,
+            };
+          }
+        }
+        updateDemoMarkers();
+        updateTeamList();
+      }
+
+      function updateDemoPositions() {
+        if (!demoReferencePoint || !demoModeEnabled) return;
+        const t = Date.now() / 1000;
+        for (const d of DEMO_USER_DEFS) {
+          const du = demoUsers[d.id];
+          if (!du) continue;
+          const ang = (2 * Math.PI) / d.period * t + d.phase;
+          const nLat = demoReferencePoint.lat + d.ampLat * Math.sin(ang);
+          const nLng = demoReferencePoint.lng + d.ampLng * Math.cos(ang);
+          const speed = d.baseSpeed + Math.sin(t * 0.7 + d.phase) * 4;
+          if (du.lat && du.lng) {
+            const dist = haversineDistance(du.lat, du.lng, nLat, nLng);
+            if (dist < 0.3) {
+              du.routePoints.push([nLat, nLng]);
+              if (du.routePoints.length > MAX_TRAIL_POINTS) du.routePoints.shift();
+            }
+          }
+          du.lat = nLat;
+          du.lng = nLng;
+          du.speed = Math.max(5, speed);
+          if (du.routePoints.length === 0) du.routePoints = [[nLat, nLng]];
+        }
+        updateDemoMarkers();
+        updateTeamList();
+      }
+
+      function updateDemoMarkers() {
+        if (!demoModeEnabled) {
+          // remove all demo markers and trails
+          for (const uid in demoUsers) {
+            if (demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
+            if (demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
+            demoUsers[uid]._marker = null;
+            demoUsers[uid]._trail = null;
+          }
+          return;
+        }
+        for (const uid in demoUsers) {
+          const du = demoUsers[uid];
+          if (!du.lat || !du.lng) continue;
+          if (!du._marker) {
+            du._marker = L.marker([du.lat, du.lng], {
+              icon: createCustomIcon(du.emoji, du.color, false),
+              zIndexOffset: 300,
+            }).addTo(demoMarkerLayerGroup);
+            du._marker.bindPopup(`<b>${escapeHtml(du.name)}</b> (Demo)<br>Speed: ${du.speed.toFixed(1)} km/h`);
+          } else {
+            du._marker.setLatLng([du.lat, du.lng]);
+            du._marker.setPopupContent(`<b>${escapeHtml(du.name)}</b> (Demo)<br>Speed: ${du.speed.toFixed(1)} km/h`);
+          }
+          if (du.routePoints.length >= 2) {
+            if (!du._trail) {
+              du._trail = L.polyline(du.routePoints, {
+                color: du.color,
+                weight: 2.5,
+                opacity: 0.4,
+                dashArray: '8 6',
+              }).addTo(demoTrailLayerGroup);
+            } else {
+              du._trail.setLatLngs(du.routePoints);
+            }
+          }
+        }
+      }
+
+      setInterval(updateDemoPositions, DEMO_UPDATE_INTERVAL_MS);
+
+      // ============================================================
+      // 9. UI UPDATES
+      // ============================================================
+      function updateMyStats() {
+        const dist = myTotalDistance;
+        let elapsed = 0;
+        if (isTracking && trackStartTime) elapsed = (Date.now() - trackStartTime) / 1000;
+        const elapsedStr = formatDuration(elapsed);
+        const altStr = myCurrentAltitude != null ? Math.round(myCurrentAltitude) : '--';
+        $mySpeed.textContent = myCurrentSpeed.toFixed(1);
+        $myDistance.textContent = dist.toFixed(2);
+        $myElapsed.textContent = elapsedStr;
+        $myAltitude.textContent = altStr;
+        $miniSpeed.textContent = myCurrentSpeed.toFixed(1);
+        $miniDist.textContent = dist.toFixed(2);
+        $miniTime.textContent = elapsedStr;
+      }
+
+      function formatDuration(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = Math.floor(sec % 60);
+        return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      }
+
+      function estimateRouteDistance(pts) {
+        if (!pts || pts.length < 2) return 0;
+        let d = 0;
+        for (let i = 1; i < pts.length; i++) {
+          d += haversineDistance(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+        }
+        return d;
+      }
+
+      function updateTeamList() {
+        const members = [];
+        // Self
+        members.push({
+          id: myUserId,
+          name: myName,
+          color: myColor,
+          speed: myCurrentSpeed,
+          distance: myTotalDistance,
+          isYou: true,
+          isActive: isTracking || useManualLocation,
+          isTracking: isTracking,
+          emoji: '🚴'
+        });
+        // Remote
+        for (const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          const active = !u._offline && u.isTracking;
+          members.push({
+            id: uid,
+            name: u.userName || 'Rider',
+            color: u.color || '#888',
+            speed: u.speed || 0,
+            distance: estimateRouteDistance(u.routePoints || []),
+            isYou: false,
+            isActive: active,
+            isTracking: u.isTracking,
+            emoji: '🚴‍♂️'
+          });
+        }
+        // Demo
+        if (demoModeEnabled) {
+          for (const uid in demoUsers) {
+            const du = demoUsers[uid];
+            members.push({
+              id: uid,
+              name: du.name,
+              color: du.color,
+              speed: du.speed || 0,
+              distance: estimateRouteDistance(du.routePoints || []),
+              isYou: false,
+              isActive: true,
+              isTracking: true,
+              isDemo: true,
+              emoji: du.emoji
+            });
+          }
+        }
+
+        if (members.length <= 1 && !demoModeEnabled) {
+          $teamList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders...</div>';
+        } else {
+          $teamList.innerHTML = members.map(m => `
+            <div class="member-card${m.isYou ? ' you' : ''}${!m.isActive && !m.isDemo ? ' offline' : ''}" onclick="window.highlightUser('${m.id}')">
+              <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
+              <div class="member-info">
+                <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${m.isDemo ? '<span style="font-size:0.6rem;color:var(--text-secondary);">demo</span>' : ''}</div>
+                <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
+              </div>
+              <span class="member-status ${m.isActive ? 'status-active' : 'status-inactive'}">${m.isDemo ? 'SIM' : m.isActive ? 'LIVE' : 'AWAY'}</span>
+            </div>
+          `).join('');
+        }
+      }
+
+      window.highlightUser = function(uid) {
+        if (uid === myUserId && myLastPosition) {
+          map.setView([myLastPosition.lat, myLastPosition.lng], 16, { animate: true });
+          followMode = true;
+          return;
+        }
+        if (remoteUsers[uid] && remoteUsers[uid].lat) {
+          map.setView([remoteUsers[uid].lat, remoteUsers[uid].lng], 16, { animate: true });
+          followMode = false;
+          return;
+        }
+        if (demoUsers[uid] && demoUsers[uid].lat) {
+          map.setView([demoUsers[uid].lat, demoUsers[uid].lng], 16, { animate: true });
+          followMode = false;
+        }
+      };
+
+      // ============================================================
+      // 10. TRACKING CONTROLS
+      // ============================================================
+      function startTracking() {
+        if (!myLastPosition) {
+          showToast('⚠️ No location yet. Wait for GPS or set manual location.');
+          return;
+        }
+        isTracking = true;
+        trackStartTime = Date.now();
+        myTotalDistance = 0;
+        myRoutePoints = [[myLastPosition.lat, myLastPosition.lng]];
+        if (userTrailPolyline) {
+          trailLayerGroup.removeLayer(userTrailPolyline);
+          userTrailPolyline = null;
+        }
+        $btnStart.style.display = 'none';
+        $btnStop.style.display = 'inline-flex';
+        $statusText.textContent = 'LIVE';
+        $statusText.style.color = 'var(--success)';
+        updateMyStats();
+        updateTeamList();
+        broadcastMyPosition();
+        showToast('🚴 Ride started!');
+        if (myLastPosition) {
+          map.setView([myLastPosition.lat, myLastPosition.lng], 15, { animate: true });
+          followMode = true;
+        }
+      }
+
+      function stopTracking() {
+        isTracking = false;
+        trackStartTime = null;
+        $btnStart.style.display = 'inline-flex';
+        $btnStop.style.display = 'none';
+        $statusText.textContent = useManualLocation ? 'MANUAL' : 'CONNECTED';
+        $statusText.style.color = useManualLocation ? 'var(--accent2)' : 'var(--success)';
+        updateMyStats();
+        updateTeamList();
+        broadcastMyPosition();
+        showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
+      }
+
+      function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        $toastContainer.appendChild(toast);
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
+      }
+
+      function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      // ============================================================
+      // 11. EVENT LISTENERS
+      // ============================================================
       const $btnStart = document.getElementById('btnStart');
       const $btnStop = document.getElementById('btnStop');
       const $btnDemo = document.getElementById('btnDemo');
@@ -334,479 +926,20 @@
       const $miniDist = document.getElementById('miniDist');
       const $miniTime = document.getElementById('miniTime');
 
-      // ── INIT MAP ──────────────────────────
-      function initMap() {
-        map = L.map('map', {
-          center: [40.7128, -74.006], zoom: 14,
-          zoomControl: false, attributionControl: true,
-        });
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap', maxZoom: 19,
-        }).addTo(map);
-        markerLayerGroup.addTo(map);
-        trailLayerGroup.addTo(map);
-        demoMarkerLayerGroup.addTo(map);
-        demoTrailLayerGroup.addTo(map);
-
-        map.on('dragstart', () => { followMode = false; });
-        map.on('dblclick', () => {
-          followMode = true;
-          if(myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), {animate:true});
-        });
-      }
-
-      // ── GEOLOCATION ────────────────────────
-      function startGeolocation() {
-        if(useManualLocation) return false;
-        if (!navigator.geolocation) {
-          showToast('⚠️ Geolocation not supported');
-          return false;
-        }
-        geoWatchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            const {latitude:lat, longitude:lng, speed, heading, altitude} = pos.coords;
-            const speedKmh = speed != null ? speed*3.6 : 0;
-            myCurrentSpeed = speedKmh;
-            myCurrentAltitude = altitude;
-            const newPos = {lat, lng, speed: speedKmh, heading, altitude, timestamp: Date.now()};
-            if(myLastPosition && isTracking) {
-              const dist = haversineDistance(myLastPosition.lat, myLastPosition.lng, lat, lng);
-              if(dist < 0.5) myTotalDistance += dist;
-            }
-            if(isTracking) {
-              myRoutePoints.push([lat, lng]);
-              if(myRoutePoints.length > MAX_TRAIL_POINTS) myRoutePoints.shift();
-            }
-            myLastPosition = newPos;
-            if(!demoReferencePoint) { demoReferencePoint = {lat, lng}; initDemoUsers(); }
-            updateMyStats(); updateMyMarker(); updateMyTrail(); broadcastMyPosition();
-            if(followMode) map.setView([lat, lng], map.getZoom(), {animate:true, duration:0.8});
-            updateStatusIndicator(true);
-          },
-          (err) => {
-            updateStatusIndicator(false);
-            let msg = 'GPS Error';
-            if(err.code===1) msg='Location permission denied';
-            else if(err.code===2) msg='Position unavailable';
-            else if(err.code===3) msg='GPS timeout';
-            $statusText.textContent=msg; $statusDot.style.background='var(--danger)';
-            showToast(`⚠️ ${msg}. Use manual location or enable GPS.`);
-            if(!demoReferencePoint && !myLastPosition) {
-              demoReferencePoint={lat:40.7128,lng:-74.006}; initDemoUsers(); map.setView([40.7128,-74.006],14);
-            }
-          },
-          { enableHighAccuracy:true, timeout:15000, maximumAge:2000 }
-        );
-        return true;
-      }
-
-      function stopGeolocation() {
-        if(geoWatchId!=null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
-      }
-
-      function updateStatusIndicator(active) {
-        if(active) {
-          $statusDot.style.background='var(--success)'; $statusDot.style.animation='pulse-dot 1.8s infinite';
-          $statusText.textContent = isTracking ? 'LIVE' : 'CONNECTED';
-          $statusText.style.color = isTracking ? 'var(--success)' : 'var(--accent2)';
-        } else {
-          $statusDot.style.background='var(--warning)'; $statusDot.style.animation='none';
-        }
-      }
-
-      // ── MANUAL LOCATION ────────────────────
-      function setManualLocation(lat, lng) {
-        stopGeolocation();
-        useManualLocation = true;
-        myLastPosition = { lat, lng, speed: 0, heading: null, altitude: null, timestamp: Date.now() };
-        myCurrentSpeed = 0; myCurrentAltitude = null;
-        if(!demoReferencePoint) { demoReferencePoint = {lat, lng}; initDemoUsers(); }
-        updateMyStats(); updateMyMarker(); broadcastMyPosition();
-        map.setView([lat, lng], 15, {animate:true});
-        $statusText.textContent = 'MANUAL'; $statusText.style.color = 'var(--accent2)';
-        $statusDot.style.background = 'var(--accent2)'; $statusDot.style.animation = 'none';
-        showToast(`📍 Location set to ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-      }
-
-      function promptManualLocation() {
-        const lat = prompt('Enter latitude (e.g., 40.7128):', myLastPosition ? myLastPosition.lat.toFixed(5) : '40.7128');
-        if(lat === null) return;
-        const lng = prompt('Enter longitude (e.g., -74.0060):', myLastPosition ? myLastPosition.lng.toFixed(5) : '-74.0060');
-        if(lng === null) return;
-        const latNum = parseFloat(lat), lngNum = parseFloat(lng);
-        if(isNaN(latNum) || isNaN(lngNum)) {
-          alert('Invalid coordinates.');
-          return;
-        }
-        setManualLocation(latNum, lngNum);
-      }
-
-      // ── HELPERS ────────────────────────────
-      function haversineDistance(lat1,lon1,lat2,lon2) {
-        const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180;
-        const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-        return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      }
-
-      function createCustomIcon(emoji, color, isYou=false) {
-        const size = isYou?50:40; const fontSize = isYou?'2rem':'1.5rem';
-        return L.divIcon({
-          html: `<div class="custom-marker${isYou?' you-marker':''}" style="background:${color};width:${size}px;height:${size}px;font-size:${fontSize};">${emoji}</div>`,
-          className:'', iconSize:[size,size+20], iconAnchor:[size/2,size/2+10], popupAnchor:[0,-size/2]
-        });
-      }
-
-      function updateMyMarker() {
-        if(!myLastPosition) return;
-        const {lat,lng}=myLastPosition;
-        if(!userMarker) {
-          userMarker = L.marker([lat,lng], {icon:createCustomIcon('🚴',myColor,true), zIndexOffset:1000}).addTo(markerLayerGroup);
-          userMarker.bindPopup(`<b>${escapeHtml(myName)}</b> (You)`);
-        } else userMarker.setLatLng([lat,lng]);
-        userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
-      }
-
-      function updateMyTrail() {
-        if(myRoutePoints.length<2) return;
-        if(userTrailPolyline) userTrailPolyline.setLatLngs(myRoutePoints);
-        else userTrailPolyline = L.polyline(myRoutePoints, {color:myColor, weight:4, opacity:0.7}).addTo(trailLayerGroup);
-      }
-
-      // ── BROADCAST (WebSocket) ──────────────
-      function broadcastMyPosition() {
-        if (!myLastPosition || !socket || socket.readyState !== WebSocket.OPEN) return;
-        const msg = JSON.stringify({
-          type: 'location_update',
-          userId: myUserId,
-          userName: myName,
-          lat: myLastPosition.lat,
-          lng: myLastPosition.lng,
-          speed: myCurrentSpeed,
-          heading: myLastPosition.heading,
-          altitude: myCurrentAltitude,
-          color: myColor,
-          timestamp: Date.now(),
-          isTracking,
-        });
-        socket.send(msg);
-      }
-
-      function handleIncomingMessage(jsonStr) {
-        let data; try { data=JSON.parse(jsonStr); } catch(e){ return; }
-        if(data.type!=='location_update' || data.userId===myUserId) return;
-        const prev = remoteUsers[data.userId];
-        const now = {
-          userId: data.userId,
-          userName: data.userName || 'Rider',
-          lat: data.lat,
-          lng: data.lng,
-          speed: data.speed || 0,
-          heading: data.heading,
-          altitude: data.altitude,
-          color: data.color || '#888',
-          timestamp: data.timestamp,
-          lastSeen: Date.now(),
-          isTracking: data.isTracking,
-          routePoints: prev ? prev.routePoints : [],
-        };
-        if (now.isTracking && prev && prev.lat !== now.lat && prev.lng !== now.lng) {
-          now.routePoints.push([now.lat, now.lng]);
-          if (now.routePoints.length > MAX_TRAIL_POINTS) now.routePoints.shift();
-        } else if (!prev) {
-          now.routePoints = [[now.lat, now.lng]];
-        }
-        remoteUsers[data.userId] = now;
-        updateRemoteMarkers();
-        updateTeamList();
-      }
-
-      // Stale user cleanup
-      setInterval(() => {
-        const now = Date.now();
-        for (const uid in remoteUsers) {
-          if (now - remoteUsers[uid].lastSeen > STALE_THRESHOLD_MS) {
-            remoteUsers[uid].isTracking = false;
-          }
-        }
-        updateTeamList();
-        updateRemoteMarkers();
-      }, 5000);
-
-      function updateRemoteMarkers() {
-        for (const uid in remoteUsers) {
-          const u = remoteUsers[uid];
-          const { lat, lng, color, userName } = u;
-          const active = (Date.now() - u.lastSeen) < STALE_THRESHOLD_MS;
-          if (!u._marker) {
-            u._marker = L.marker([lat, lng], {
-              icon: createCustomIcon('🚴‍♂️', color, false),
-              zIndexOffset: 500,
-              opacity: active ? 1 : 0.5,
-            }).addTo(markerLayerGroup);
-            u._marker.bindPopup(`<b>${escapeHtml(userName)}</b><br>Speed: ${(u.speed||0).toFixed(1)} km/h`);
-          } else {
-            u._marker.setLatLng([lat, lng]);
-            u._marker.setOpacity(active ? 1 : 0.5);
-            u._marker.setPopupContent(`<b>${escapeHtml(userName)}</b><br>Speed: ${(u.speed||0).toFixed(1)} km/h<br>${active ? '🟢 Active' : '🟠 Away'}`);
-          }
-          if (u.routePoints.length >= 2) {
-            if (!u._trail) {
-              u._trail = L.polyline(u.routePoints, {
-                color: color,
-                weight: 3,
-                opacity: 0.5,
-                dashArray: '6 4',
-              }).addTo(trailLayerGroup);
-            } else {
-              u._trail.setLatLngs(u.routePoints);
-            }
-            u._trail.setStyle({ opacity: active ? 0.5 : 0.2 });
-          }
-        }
-      }
-
-      // ── DEMO RIDERS ────────────────────────
-      const DEMO_USER_DEFS = [
-        {id:'demo_1',name:'Alex',emoji:'🚴',color:'#ff6b6b',baseSpeed:22,ampLat:0.008,ampLng:0.010,phase:0,period:180},
-        {id:'demo_2',name:'Sam',emoji:'🚴‍♀️',color:'#ffd93d',baseSpeed:18,ampLat:0.006,ampLng:0.012,phase:1.2,period:220},
-        {id:'demo_3',name:'Jordan',emoji:'🚴',color:'#6bcb77',baseSpeed:26,ampLat:0.010,ampLng:0.007,phase:2.5,period:160},
-        {id:'demo_4',name:'Riley',emoji:'🚴‍♀️',color:'#845ef7',baseSpeed:20,ampLat:0.009,ampLng:0.009,phase:4.0,period:200}
-      ];
-
-      function initDemoUsers() {
-        if(!demoReferencePoint) return;
-        for(const d of DEMO_USER_DEFS) {
-          if(!demoUsers[d.id]) {
-            demoUsers[d.id] = {
-              ...d,
-              lat: demoReferencePoint.lat + d.ampLat * Math.sin(d.phase),
-              lng: demoReferencePoint.lng + d.ampLng * Math.cos(d.phase),
-              speed: d.baseSpeed + (Math.random()-0.5)*6,
-              routePoints: [],
-              _marker: null,
-              _trail: null,
-            };
-          }
-        }
-        updateDemoMarkers();
-        updateTeamList();
-      }
-
-      function updateDemoPositions() {
-        if(!demoReferencePoint || !demoModeEnabled) return;
-        const t = Date.now() / 1000;
-        for(const d of DEMO_USER_DEFS) {
-          const du = demoUsers[d.id];
-          if(!du) continue;
-          const ang = (2*Math.PI)/d.period * t + d.phase;
-          const nLat = demoReferencePoint.lat + d.ampLat * Math.sin(ang);
-          const nLng = demoReferencePoint.lng + d.ampLng * Math.cos(ang);
-          const speed = d.baseSpeed + Math.sin(t*0.7+d.phase)*4;
-          if(du.lat && du.lng) {
-            const dist = haversineDistance(du.lat, du.lng, nLat, nLng);
-            if(dist < 0.3) {
-              du.routePoints.push([nLat, nLng]);
-              if(du.routePoints.length > MAX_TRAIL_POINTS) du.routePoints.shift();
-            }
-          }
-          du.lat = nLat;
-          du.lng = nLng;
-          du.speed = Math.max(5, speed);
-          if(du.routePoints.length === 0) du.routePoints = [[nLat, nLng]];
-        }
-        updateDemoMarkers();
-        updateTeamList();
-      }
-
-      function updateDemoMarkers() {
-        if(!demoModeEnabled) {
-          for(const uid in demoUsers) {
-            if(demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
-            if(demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
-            demoUsers[uid]._marker = null;
-            demoUsers[uid]._trail = null;
-          }
-          return;
-        }
-        for(const uid in demoUsers) {
-          const du = demoUsers[uid];
-          if(!du.lat || !du.lng) continue;
-          if(!du._marker) {
-            du._marker = L.marker([du.lat, du.lng], {
-              icon: createCustomIcon(du.emoji, du.color, false),
-              zIndexOffset: 300,
-            }).addTo(demoMarkerLayerGroup);
-            du._marker.bindPopup(`<b>${escapeHtml(du.name)}</b> (Demo)<br>Speed: ${du.speed.toFixed(1)} km/h`);
-          } else {
-            du._marker.setLatLng([du.lat, du.lng]);
-            du._marker.setPopupContent(`<b>${escapeHtml(du.name)}</b> (Demo)<br>Speed: ${du.speed.toFixed(1)} km/h`);
-          }
-          if(du.routePoints.length >= 2) {
-            if(!du._trail) {
-              du._trail = L.polyline(du.routePoints, {
-                color: du.color,
-                weight: 2.5,
-                opacity: 0.4,
-                dashArray: '8 6',
-              }).addTo(demoTrailLayerGroup);
-            } else {
-              du._trail.setLatLngs(du.routePoints);
-            }
-          }
-        }
-      }
-
-      setInterval(updateDemoPositions, DEMO_UPDATE_INTERVAL_MS);
-
-      // ── UI UPDATES ────────────────────────
-      function updateMyStats() {
-        const dist = myTotalDistance;
-        let elapsed = 0;
-        if(isTracking && trackStartTime) elapsed = (Date.now() - trackStartTime) / 1000;
-        const elapsedStr = formatDuration(elapsed);
-        const altStr = myCurrentAltitude != null ? Math.round(myCurrentAltitude) : '--';
-        $mySpeed.textContent = myCurrentSpeed.toFixed(1);
-        $myDistance.textContent = dist.toFixed(2);
-        $myElapsed.textContent = elapsedStr;
-        $myAltitude.textContent = altStr;
-        $miniSpeed.textContent = myCurrentSpeed.toFixed(1);
-        $miniDist.textContent = dist.toFixed(2);
-        $miniTime.textContent = elapsedStr;
-      }
-
-      function formatDuration(sec) {
-        const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
-        return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-      }
-
-      function updateTeamList() {
-        const members = [];
-        members.push({
-          id: myUserId, name: myName, color: myColor,
-          speed: myCurrentSpeed, distance: myTotalDistance,
-          isYou: true, isActive: isTracking || useManualLocation, isTracking, emoji: '🚴'
-        });
-        for(const uid in remoteUsers) {
-          const u = remoteUsers[uid];
-          const active = (Date.now() - u.lastSeen) < STALE_THRESHOLD_MS;
-          members.push({
-            id: uid, name: u.userName, color: u.color,
-            speed: u.speed || 0, distance: estimateRouteDistance(u.routePoints),
-            isYou: false, isActive: active && u.isTracking, isTracking: u.isTracking, emoji: '🚴‍♂️'
-          });
-        }
-        if(demoModeEnabled) {
-          for(const uid in demoUsers) {
-            const du = demoUsers[uid];
-            members.push({
-              id: uid, name: du.name, color: du.color,
-              speed: du.speed || 0, distance: estimateRouteDistance(du.routePoints),
-              isYou: false, isActive: true, isTracking: true, isDemo: true, emoji: du.emoji
-            });
-          }
-        }
-        if(members.length <= 1 && !demoModeEnabled) {
-          $teamList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders...</div>';
-        } else {
-          $teamList.innerHTML = members.map(m => `
-            <div class="member-card${m.isYou?' you':''}${!m.isActive&&!m.isDemo?' offline':''}" onclick="window.highlightUser('${m.id}')">
-              <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
-              <div class="member-info">
-                <div class="member-name">${escapeHtml(m.name)} ${m.isYou?'<span class="badge-you">YOU</span>':''} ${m.isDemo?'<span style="font-size:0.6rem;color:var(--text-secondary);">demo</span>':''}</div>
-                <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
-              </div>
-              <span class="member-status ${m.isActive?'status-active':'status-inactive'}">${m.isDemo?'SIM':m.isActive?'LIVE':'AWAY'}</span>
-            </div>
-          `).join('');
-        }
-      }
-
-      function estimateRouteDistance(pts) {
-        if(!pts || pts.length < 2) return 0;
-        let d = 0;
-        for(let i=1; i<pts.length; i++) d += haversineDistance(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
-        return d;
-      }
-
-      window.highlightUser = function(uid) {
-        if(uid === myUserId && myLastPosition) {
-          map.setView([myLastPosition.lat, myLastPosition.lng], 16, {animate:true});
-          followMode = true;
-          return;
-        }
-        if(remoteUsers[uid]?.lat) {
-          map.setView([remoteUsers[uid].lat, remoteUsers[uid].lng], 16, {animate:true});
-          followMode = false;
-          return;
-        }
-        if(demoUsers[uid]?.lat) {
-          map.setView([demoUsers[uid].lat, demoUsers[uid].lng], 16, {animate:true});
-          followMode = false;
-        }
-      };
-
-      function startTracking() {
-        if(!myLastPosition) {
-          showToast('⚠️ No location yet. Wait for GPS or set manual location.');
-          return;
-        }
-        isTracking = true;
-        trackStartTime = Date.now();
-        myTotalDistance = 0;
-        myRoutePoints = [[myLastPosition.lat, myLastPosition.lng]];
-        if(userTrailPolyline) { trailLayerGroup.removeLayer(userTrailPolyline); userTrailPolyline = null; }
-        $btnStart.style.display = 'none';
-        $btnStop.style.display = 'inline-flex';
-        $statusText.textContent = 'LIVE';
-        $statusText.style.color = 'var(--success)';
-        updateMyStats();
-        updateTeamList();
-        broadcastMyPosition();
-        showToast('🚴 Ride started!');
-        if(myLastPosition) { map.setView([myLastPosition.lat, myLastPosition.lng], 15, {animate:true}); followMode = true; }
-      }
-
-      function stopTracking() {
-        isTracking = false;
-        trackStartTime = null;
-        $btnStart.style.display = 'inline-flex';
-        $btnStop.style.display = 'none';
-        $statusText.textContent = useManualLocation ? 'MANUAL' : 'CONNECTED';
-        $statusText.style.color = useManualLocation ? 'var(--accent2)' : 'var(--success)';
-        updateMyStats();
-        updateTeamList();
-        broadcastMyPosition();
-        showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
-      }
-
-      function showToast(msg) {
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = msg;
-        $toastContainer.appendChild(toast);
-        setTimeout(() => { if(toast.parentNode) toast.remove(); }, 3000);
-      }
-
-      function escapeHtml(s) {
-        const d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
-      }
-
-      // ── EVENT LISTENERS ──────────────────
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
       $btnDemo.addEventListener('click', () => {
         demoModeEnabled = !demoModeEnabled;
-        if(demoModeEnabled) {
-          if(!demoReferencePoint) demoReferencePoint = myLastPosition ? {lat: myLastPosition.lat, lng: myLastPosition.lng} : {lat:40.7128, lng:-74.006};
+        if (demoModeEnabled) {
+          if (!demoReferencePoint) {
+            demoReferencePoint = myLastPosition ? { lat: myLastPosition.lat, lng: myLastPosition.lng } : { lat: 40.7128, lng: -74.006 };
+          }
           initDemoUsers();
         } else {
-          for(const uid in demoUsers) {
-            if(demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
-            if(demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
+          for (const uid in demoUsers) {
+            if (demoUsers[uid]._marker) demoMarkerLayerGroup.removeLayer(demoUsers[uid]._marker);
+            if (demoUsers[uid]._trail) demoTrailLayerGroup.removeLayer(demoUsers[uid]._trail);
             demoUsers[uid]._marker = null;
             demoUsers[uid]._trail = null;
           }
@@ -823,13 +956,13 @@
 
       $followBtn.addEventListener('click', () => {
         followMode = true;
-        if(myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), {animate:true});
+        if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
         showToast('📍 Following you');
       });
 
       $locateBtn.addEventListener('click', () => {
-        if(myLastPosition) {
-          map.setView([myLastPosition.lat, myLastPosition.lng], 16, {animate:true});
+        if (myLastPosition) {
+          map.setView([myLastPosition.lat, myLastPosition.lng], 16, { animate: true });
           followMode = true;
         } else {
           showToast('⏳ No position yet');
@@ -844,30 +977,35 @@
         localStorage.setItem('biketeam_myname', myName);
         updateTeamList();
         broadcastMyPosition();
-        if(userMarker) userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+        if (userMarker) {
+          userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+        }
       });
 
       document.addEventListener('keydown', (e) => {
-        if(e.key === 'f' && document.activeElement === document.body) { $followBtn.click(); }
-        if(e.key === 's' && document.activeElement === document.body) { if(!isTracking) startTracking(); else stopTracking(); }
-        if(e.key === 'd' && document.activeElement === document.body) { $btnDemo.click(); }
+        if (e.key === 'f' && document.activeElement === document.body) { $followBtn.click(); }
+        if (e.key === 's' && document.activeElement === document.body) { if (!isTracking) startTracking(); else stopTracking(); }
+        if (e.key === 'd' && document.activeElement === document.body) { $btnDemo.click(); }
       });
 
       window.addEventListener('resize', () => {
-        if(window.innerWidth > 768) {
+        if (window.innerWidth > 768) {
           $sidebar.style.transform = '';
         } else {
           $sidebar.style.transform = $sidebar.classList.contains('hidden') ? 'translateX(-100%)' : 'translateX(0)';
         }
       });
 
-      // Periodic broadcast & remote cleanup
+      // Periodic broadcast
       setInterval(() => {
-        broadcastMyPosition();
-        updateRemoteMarkers();
+        if (myLastPosition) {
+          broadcastMyPosition();
+        }
       }, UPDATE_INTERVAL_MS);
 
-      // ── INIT ──────────────────────────────
+      // ============================================================
+      // 12. INIT
+      // ============================================================
       function init() {
         initMap();
         $myNameInput.value = myName;
@@ -877,10 +1015,13 @@
         } else {
           $sidebar.classList.remove('hidden');
         }
+
+        // Try GPS
         const geoStarted = startGeolocation();
-        if(!geoStarted && !useManualLocation) {
-          if(!myLastPosition) {
-            demoReferencePoint = {lat:40.7128, lng:-74.006};
+        if (!geoStarted && !useManualLocation) {
+          // fallback: start with demo
+          if (!myLastPosition) {
+            demoReferencePoint = { lat: 40.7128, lng: -74.006 };
             initDemoUsers();
             map.setView([40.7128, -74.006], 14);
             $statusText.textContent = 'NO GPS';
@@ -888,12 +1029,19 @@
             $statusDot.style.animation = 'none';
           }
         }
+
+        // Ensure demo reference is set after a moment
         setTimeout(() => {
-          if(!demoReferencePoint && myLastPosition) demoReferencePoint = {lat: myLastPosition.lat, lng: myLastPosition.lng};
-          if(!demoReferencePoint) demoReferencePoint = {lat:40.7128, lng:-74.006};
+          if (!demoReferencePoint && myLastPosition) {
+            demoReferencePoint = { lat: myLastPosition.lat, lng: myLastPosition.lng };
+          }
+          if (!demoReferencePoint) {
+            demoReferencePoint = { lat: 40.7128, lng: -74.006 };
+          }
           initDemoUsers();
           updateTeamList();
         }, 2000);
+
         updateTeamList();
         setInterval(updateMyStats, 1000);
       }
