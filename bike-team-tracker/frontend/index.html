@@ -267,10 +267,10 @@
   </div>
   <div id="toastContainer"></div>
 
-  <script>
-    (function() {
+<script>
+      (function() {
       // ============================================================
-      // 1. 🔥 FIREBASE CONFIG – PASTE YOUR OWN CONFIG HERE
+      // 1. 🔥 FIREBASE CONFIG
       // ============================================================
       const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
@@ -286,7 +286,25 @@
       const database = firebase.database();
 
       // ============================================================
-      // 2. STATE – each device gets a UNIQUE ID
+      // 2. 🔑 JOIN A TEAM (Room Name)
+      // ============================================================
+      // 👇 This is the "Join Team" step. Type the same name to see each other!
+      let teamCode = localStorage.getItem('biketeam_teamcode');
+      if (!teamCode) {
+        teamCode = prompt('🔑 Enter Team Code to join (e.g., "Race1"):', 'Race1');
+        if (teamCode) {
+          localStorage.setItem('biketeam_teamcode', teamCode);
+        } else {
+          teamCode = 'DefaultTeam'; // fallback
+        }
+      }
+      // Clean the team code (no spaces, safe for Firebase)
+      teamCode = teamCode.replace(/\s/g, '_');
+
+      console.log(`✅ Joined Team: ${teamCode}`);
+
+      // ============================================================
+      // 3. STATE – each device gets a UNIQUE ID
       // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
@@ -294,7 +312,6 @@
       const MAX_TRAIL_POINTS = 300;
       const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
 
-      // 🔑 Unique per browser/device – never clashes with another rider
       const myUserId = 'user_' + Math.random().toString(36).substring(2,10);
       let myName = localStorage.getItem('biketeam_myname') || 'Me';
       const myColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
@@ -324,9 +341,10 @@
       let userTrailPolyline = null;
 
       // ============================================================
-      // 3. FIREBASE SYNC – separate record per user
+      // 4. FIREBASE SYNC – separated by TEAM CODE
       // ============================================================
-      const myLocationRef = database.ref('locations/' + myUserId);
+      // 👇 Data is stored inside: /teams/{teamCode}/{userId}/
+      const myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
 
       function broadcastMyPosition() {
         if (!myLastPosition) return;
@@ -345,14 +363,14 @@
         myLocationRef.set(data);
       }
 
-      // 👇 LISTEN to ALL other riders live
-      const locationsRef = database.ref('locations');
+      // 👇 Listen ONLY to users in the SAME team code
+      const locationsRef = database.ref('teams/' + teamCode);
       locationsRef.on('child_added', (snapshot) => {
         if (snapshot.key === myUserId) return;
         remoteUsers[snapshot.key] = snapshot.val();
         updateRemoteMarkers();
         updateTeamList();
-        console.log('➕ Rider added:', snapshot.key);
+        showToast(`👋 ${remoteUsers[snapshot.key]?.userName || 'Rider'} joined the team!`);
       });
 
       locationsRef.on('child_changed', (snapshot) => {
@@ -364,7 +382,6 @@
         }
         updateRemoteMarkers();
         updateTeamList();
-        console.log('🔄 Rider updated:', snapshot.key);
       });
 
       locationsRef.on('child_removed', (snapshot) => {
@@ -375,7 +392,6 @@
         }
         delete remoteUsers[uid];
         updateTeamList();
-        console.log('❌ Rider removed:', uid);
       });
 
       // Mark stale riders offline
@@ -397,7 +413,8 @@
       }, 5000);
 
       // ============================================================
-      // 4. MAP
+      // 5. MAP, GEOLOCATION, HELPERS, UI (same as before)
+      // (I'm keeping the rest identical to save space, but it's all here)
       // ============================================================
       function initMap() {
         map = L.map('map', {
@@ -424,9 +441,6 @@
         });
       }
 
-      // ============================================================
-      // 5. GEOLOCATION
-      // ============================================================
       function startGeolocation() {
         if (useManualLocation) return false;
         if (!navigator.geolocation) {
@@ -507,9 +521,6 @@
         }
       }
 
-      // ============================================================
-      // 6. MANUAL LOCATION
-      // ============================================================
       function setManualLocation(lat, lng) {
         stopGeolocation();
         useManualLocation = true;
@@ -544,9 +555,6 @@
         setManualLocation(latNum, lngNum);
       }
 
-      // ============================================================
-      // 7. HELPERS
-      // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -629,9 +637,7 @@
         }
       }
 
-      // ============================================================
-      // 8. DEMO RIDERS (optional)
-      // ============================================================
+      // DEMO RIDERS (same as before)
       const DEMO_USER_DEFS = [
         { id: 'demo_1', name: 'Alex', emoji: '🚴', color: '#ff6b6b', baseSpeed: 22, ampLat: 0.008, ampLng: 0.010, phase: 0, period: 180 },
         { id: 'demo_2', name: 'Sam', emoji: '🚴‍♀️', color: '#ffd93d', baseSpeed: 18, ampLat: 0.006, ampLng: 0.012, phase: 1.2, period: 220 },
@@ -724,9 +730,7 @@
 
       setInterval(updateDemoPositions, DEMO_UPDATE_INTERVAL_MS);
 
-      // ============================================================
-      // 9. UI UPDATES
-      // ============================================================
+      // UI UPDATES
       function updateMyStats() {
         const dist = myTotalDistance;
         let elapsed = 0;
@@ -837,9 +841,7 @@
         }
       };
 
-      // ============================================================
-      // 10. TRACKING CONTROLS
-      // ============================================================
+      // TRACKING CONTROLS
       function startTracking() {
         if (!myLastPosition) {
           showToast('⚠️ No location yet. Wait for GPS or set manual location.');
@@ -894,9 +896,7 @@
         return d.innerHTML;
       }
 
-      // ============================================================
-      // 11. EVENT LISTENERS
-      // ============================================================
+      // EVENT LISTENERS
       const $btnStart = document.getElementById('btnStart');
       const $btnStop = document.getElementById('btnStop');
       const $btnDemo = document.getElementById('btnDemo');
@@ -990,13 +990,12 @@
         }
       });
 
-      // Periodically broadcast (ensures fresh data even if GPS is slow)
       setInterval(() => {
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
       // ============================================================
-      // 12. INIT
+      // 13. INIT
       // ============================================================
       function init() {
         initMap();
@@ -1033,11 +1032,12 @@
 
         updateTeamList();
         setInterval(updateMyStats, 1000);
-        console.log('✅ BikeTeam started. Your ID:', myUserId);
+        console.log(`✅ BikeTeam started. Team: ${teamCode}, Your ID: ${myUserId}`);
+        showToast(`🔑 Joined Team: ${teamCode}`);
       }
 
       init();
     })();
-  </script>
+</script>
 </body>
 </html>
