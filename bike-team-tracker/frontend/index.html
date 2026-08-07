@@ -223,31 +223,38 @@
 
   <div class="main-container">
     <aside class="sidebar hidden" id="sidebar">
-      <div class="sidebar-section">
-        <h3>📊 My Ride</h3>
-        <div class="my-stats">
-          <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
-          <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
-          <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
-          <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
-        </div>
-        <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
-          <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
-            style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
-                   padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
-        </div>
-        <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
-          📍 Set manual location
-        </button>
-        <button class="btn btn-outline btn-sm" id="btnCheckFirebase" style="margin-top:8px; width:100%; border-color: var(--accent2);">
-          🔍 Test Firebase Connection
-        </button>
-      </div>
-      <div class="sidebar-section" style="flex:1;">
-        <h3>👥 Team (<span id="teamCount">0</span>)</h3>
-        <div class="team-list" id="teamList"></div>
-      </div>
-    </aside>
+  <!-- NEW: Close button + Header -->
+  <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
+    <h3 style="margin:0; font-size:1rem; color:var(--accent2);">👥 Team Panel</h3>
+    <button id="closeSidebarBtn" style="background:none; border:none; color:var(--text); font-size:1.8rem; cursor:pointer; padding:0 8px; line-height:1;">✕</button>
+  </div>
+  
+  <!-- Original Sidebar Content -->
+  <div class="sidebar-section">
+    <h3>📊 My Ride</h3>
+    <div class="my-stats">
+      <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
+      <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
+      <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
+      <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
+      <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
+        style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
+               padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
+    </div>
+    <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
+      📍 Set manual location
+    </button>
+    <!-- <button class="btn btn-outline btn-sm" id="btnCheckFirebase" style="margin-top:8px; width:100%; border-color: var(--accent2);">
+      🔍 Test Firebase Connection
+    </button> -->
+  </div>
+  <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+    <h3>👥 Team (<span id="teamCount">0</span>)</h3>
+    <div class="team-list" id="teamList"></div>
+  </div>
+</aside>
 
     <div class="map-container">
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
@@ -837,6 +844,24 @@
       $btnStop.addEventListener('click', stopTracking);
 
       $toggleSidebar.addEventListener('click', () => {
+        // 1. Close button inside the sidebar (the ✕ icon)
+          const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
+          if ($closeSidebarBtn) {
+            $closeSidebarBtn.addEventListener('click', () => {
+              $sidebar.classList.add('hidden');
+              if (window.innerWidth <= 768) {
+                $sidebar.style.transform = 'translateX(-100%)';
+              }
+            });
+          }
+
+          // 2. Tap on the map to close the sidebar (on mobile)
+          map.on('click', () => {
+            if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
+              $sidebar.classList.add('hidden');
+              $sidebar.style.transform = 'translateX(-100%)';
+            }
+          });
         $sidebar.classList.toggle('hidden');
         if (window.innerWidth <= 768) {
           $sidebar.style.transform = $sidebar.classList.contains('hidden') ? 'translateX(-100%)' : 'translateX(0)';
