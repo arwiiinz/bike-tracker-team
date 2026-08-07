@@ -7,6 +7,7 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="manifest" href="/manifest.json">
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -271,10 +272,10 @@
   </div>
   <div id="toastContainer"></div>
 
-  <script>
+<script>
       (function() {
       // ============================================================
-      // 1. 🔥 FIREBASE CONFIG (YOUR CONFIG)
+      // 1. 🔥 FIREBASE CONFIG
       // ============================================================
       const firebaseConfig = {
         apiKey: "AIzaSyDQI0kkCJPNq-RYtzKhCEYS5sjQRcc5X0E",
@@ -309,14 +310,23 @@
       console.log(`✅ Joined Team: ${teamCode}`);
 
       // ============================================================
-      // 3. STATE – each device gets a UNIQUE ID
+      // 3. 🔥 FIX #1: PERSISTENT USER ID (No more random new user on refresh!)
+      // ============================================================
+      let myUserId = localStorage.getItem('biketeam_userid');
+      if (!myUserId) {
+        myUserId = 'user_' + Math.random().toString(36).substring(2,10);
+        localStorage.setItem('biketeam_userid', myUserId);
+      }
+      console.log(`🆔 Persistent User ID: ${myUserId}`);
+
+      // ============================================================
+      // 4. STATE
       // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
       const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
 
-      const myUserId = 'user_' + Math.random().toString(36).substring(2,10);
       let myName = localStorage.getItem('biketeam_myname') || 'Me';
       const myColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
 
@@ -340,7 +350,56 @@
       let userTrailPolyline = null;
 
       // ============================================================
-      // 4. FIREBASE SYNC
+      // 5. 🔥 FIX #2: USERNAME VALIDATION (Claim a name in the team)
+      // ============================================================
+      function validateAndSetUsername(newName) {
+        if (!newName || newName.trim() === '') {
+          showToast('⚠️ Name cannot be empty.', true);
+          return false;
+        }
+        const trimmedName = newName.trim();
+        
+        // Check if this name is already taken by SOMEONE ELSE in this team
+        return database.ref('teams/' + teamCode)
+          .orderByChild('userName')
+          .equalTo(trimmedName)
+          .once('value')
+          .then((snapshot) => {
+            let taken = false;
+            snapshot.forEach((childSnapshot) => {
+              const data = childSnapshot.val();
+              // If the user ID matches MINE, it's ME, so it's allowed.
+              if (childSnapshot.key !== myUserId) {
+                taken = true;
+              }
+            });
+
+            if (taken) {
+              showToast(`❌ Username "${trimmedName}" is already taken in this team!`, true);
+              // Revert the input field to the old valid name
+              $myNameInput.value = myName;
+              return false;
+            } else {
+              // Name is free! Save it.
+              myName = trimmedName;
+              localStorage.setItem('biketeam_myname', myName);
+              updateTeamList();
+              broadcastMyPosition();
+              if (userMarker) {
+                userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+              }
+              showToast(`✅ Username set to "${myName}"`);
+              return true;
+            }
+          }).catch((error) => {
+            console.error('Validation error:', error);
+            showToast('⚠️ Could not validate name. Check Firebase rules.', true);
+            return false;
+          });
+      }
+
+      // ============================================================
+      // 6. FIREBASE SYNC
       // ============================================================
       const myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
 
@@ -419,7 +478,7 @@
       }, 5000);
 
       // ============================================================
-      // 5. MAP
+      // 7. MAP
       // ============================================================
       function initMap() {
         map = L.map('map', {
@@ -443,7 +502,7 @@
           if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
         });
 
-        // ✅ ADDED: Close sidebar on map click (mobile only)
+        // Close sidebar on map click (mobile only)
         map.on('click', () => {
           if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
             $sidebar.classList.add('hidden');
@@ -453,7 +512,7 @@
       }
 
       // ============================================================
-      // 6. GEOLOCATION
+      // 8. GEOLOCATION
       // ============================================================
       function startGeolocation() {
         if (useManualLocation) return false;
@@ -529,7 +588,7 @@
       }
 
       // ============================================================
-      // 7. MANUAL LOCATION
+      // 9. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
         stopGeolocation();
@@ -562,7 +621,7 @@
       }
 
       // ============================================================
-      // 8. HELPERS
+      // 10. HELPERS
       // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
@@ -647,7 +706,7 @@
       }
 
       // ============================================================
-      // 9. UI UPDATES
+      // 11. UI UPDATES
       // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
@@ -682,6 +741,7 @@
 
       function updateTeamList() {
         const members = [];
+        // Self
         members.push({
           id: myUserId,
           name: myName,
@@ -693,6 +753,7 @@
           isTracking: isTracking,
           emoji: '🚴'
         });
+        // Remote
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
@@ -740,7 +801,7 @@
       };
 
       // ============================================================
-      // 10. TRACKING CONTROLS
+      // 12. TRACKING CONTROLS
       // ============================================================
       function startTracking() {
         if (!myLastPosition) {
@@ -797,7 +858,7 @@
       }
 
       // ============================================================
-      // 11. TEST FIREBASE CONNECTION
+      // 13. TEST FIREBASE CONNECTION
       // ============================================================
       function testFirebaseConnection() {
         const testRef = database.ref('teams/' + teamCode + '/_test');
@@ -815,7 +876,7 @@
       }
 
       // ============================================================
-      // 12. EVENT LISTENERS
+      // 14. EVENT LISTENERS
       // ============================================================
       const $btnStart = document.getElementById('btnStart');
       const $btnStop = document.getElementById('btnStop');
@@ -862,8 +923,6 @@
         });
       }
 
-      // ⚠️ REMOVED the erroneous map.on('click') here – it's now inside initMap()
-
       $followBtn.addEventListener('click', () => {
         followMode = true;
         if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
@@ -883,13 +942,28 @@
       $manualBtn.addEventListener('click', promptManualLocation);
       $btnCheckFirebase.addEventListener('click', testFirebaseConnection);
 
-      $myNameInput.addEventListener('input', () => {
-        myName = $myNameInput.value.trim() || 'Me';
-        localStorage.setItem('biketeam_myname', myName);
-        updateTeamList();
-        broadcastMyPosition();
-        if (userMarker) {
-          userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+      // 🔥 FIXED: Validate username when user types or pastes
+      $myNameInput.addEventListener('change', function() {
+        const newName = this.value.trim();
+        if (newName && newName !== myName) {
+          validateAndSetUsername(newName);
+        } else if (!newName) {
+          showToast('⚠️ Name cannot be empty.', true);
+          this.value = myName; // revert
+        }
+      });
+
+      // Also validate on Enter key
+      $myNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const newName = $myNameInput.value.trim();
+          if (newName && newName !== myName) {
+            validateAndSetUsername(newName);
+          } else if (!newName) {
+            showToast('⚠️ Name cannot be empty.', true);
+            $myNameInput.value = myName;
+          }
         }
       });
 
@@ -911,10 +985,11 @@
       }, UPDATE_INTERVAL_MS);
 
       // ============================================================
-      // 13. INIT
+      // 15. INIT
       // ============================================================
       function init() {
-        initMap();  // ✅ This creates the map
+        initMap(); // Map loads here
+        
         $myNameInput.value = myName;
         if (window.innerWidth <= 768) {
           $sidebar.classList.add('hidden');
@@ -938,13 +1013,40 @@
         console.log(`✅ BikeTeam started. Team: ${teamCode}, Your ID: ${myUserId}`);
         showToast(`🔑 Joined Team: ${teamCode}`);
         
+        // 🔥 FIX #3: Validate the existing username on startup!
+        // This ensures if someone else took our name while we were offline, we get kicked.
+        setTimeout(() => {
+          validateAndSetUsername(myName);
+        }, 1000);
+        
         // Auto-test Firebase after 3 seconds
         setTimeout(testFirebaseConnection, 3000);
-        
-        // ✅ The map click listener is already inside initMap() – no need to add again here.
       }
 
       init();
+
+      // ============================================================
+      // 16. 🚀 SERVICE WORKER REGISTRATION (FIX for "no running service worker")
+      // ============================================================
+      if ('serviceWorker' in navigator) {
+        // Add a small delay to ensure the page is fully loaded
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('✅ Service Worker registered successfully! Scope:', registration.scope);
+              showToast('📲 App can now be installed!');
+            })
+            .catch((error) => {
+              console.error('❌ Service Worker registration failed:', error);
+              // Common reasons: 404 (file missing), or serving from wrong path.
+              // If it fails, check if /sw.js exists in your Render root folder.
+              showToast('⚠️ Service Worker failed. Check console for details.', true);
+            });
+        });
+      } else {
+        console.warn('⚠️ Service Workers are not supported in this browser.');
+      }
+
     })();
 </script>
 </body>
