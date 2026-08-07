@@ -7,11 +7,11 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="manifest" href="/manifest.json">
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
+    /* ===== YOUR EXISTING STYLES (unchanged) ===== */
     :root {
       --bg: #1a1a2e;
       --panel: #16213e;
@@ -78,6 +78,8 @@
     .btn-outline { border: 2px solid var(--border); color: var(--text); background: transparent; }
     .btn-outline:active { border-color: var(--accent2); color: var(--accent2); }
     .btn-sm { padding: 6px 10px; font-size: 0.7rem; }
+    .btn-danger { border-color: var(--danger); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
 
     .main-container { display: flex; flex:1; overflow: hidden; position: relative; }
 
@@ -131,6 +133,7 @@
     .status-active { background: rgba(46,204,113,0.2); color: var(--success); }
     .status-inactive { background: rgba(243,156,12,0.2); color: var(--warning); }
     .badge-you { background: var(--accent2); color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
+    .badge-leader { background: #ffd93d; color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 8px; font-weight: 700; margin-left: 4px; }
 
     .map-container { flex:1; position: relative; z-index: 100; }
     #map { width:100%; height:100%; background:#1a2a3a; }
@@ -173,6 +176,28 @@
     @keyframes slideIn { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
     @keyframes slideOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(120%); opacity:0; } }
 
+    /* MODAL (for team creation/join) */
+    .modal-overlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .modal-box {
+      background: var(--panel); border-radius: var(--radius);
+      padding: 28px 24px; max-width: 400px; width: 90%;
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    .modal-box h2 { color: var(--accent2); margin-bottom: 16px; text-align: center; }
+    .modal-box input {
+      width: 100%; padding: 12px; margin: 8px 0; border-radius: 20px;
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      font-size: 1rem; outline: none; text-align: center;
+    }
+    .modal-box input:focus { border-color: var(--accent2); }
+    .modal-box .btn-group { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+    .modal-box .btn-group .btn { flex:1; justify-content: center; }
+
     @media (max-width: 768px) {
       :root { --header-h: 48px; --sidebar-w: 280px; }
       .header { padding: 0 8px; gap: 6px; }
@@ -193,6 +218,7 @@
       .stat-value { font-size: 1.2rem; }
       .member-card { padding: 8px 10px; gap: 8px; }
       .member-dot { width: 32px; height: 32px; font-size: 1.1rem; }
+      .modal-box { padding: 20px 16px; }
     }
 
     .leaflet-div-icon { background: transparent !important; border: none !important; }
@@ -209,6 +235,11 @@
     @keyframes bounce-marker {
       from { transform: translateY(0); } to { transform: translateY(-5px); }
     }
+
+    .admin-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .admin-section .admin-title { color: var(--warning); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .admin-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; cursor: pointer; }
+    .admin-btn:hover { background: var(--danger); color: #fff; }
   </style>
 </head>
 <body>
@@ -224,38 +255,35 @@
 
   <div class="main-container">
     <aside class="sidebar hidden" id="sidebar">
-  <!-- NEW: Close button + Header -->
-  <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
-    <h3 style="margin:0; font-size:1rem; color:var(--accent2);">👥 Team Panel</h3>
-    <button id="closeSidebarBtn" style="background:none; border:none; color:var(--text); font-size:1.8rem; cursor:pointer; padding:0 8px; line-height:1;">✕</button>
-  </div>
-  
-  <!-- Original Sidebar Content -->
-  <div class="sidebar-section">
-    <h3>📊 My Ride</h3>
-    <div class="my-stats">
-      <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
-      <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
-      <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
-      <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
-    </div>
-    <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
-      <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
-        style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
-               padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
-    </div>
-    <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
-      📍 Set manual location
-    </button>
-    <button class="btn btn-outline btn-sm" id="btnCheckFirebase" style="margin-top:8px; width:100%; border-color: var(--accent2);">
-      🔍 Test Firebase Connection
-    </button>
-  </div>
-  <div class="sidebar-section" style="flex:1; overflow-y:auto;">
-    <h3>👥 Team (<span id="teamCount">0</span>)</h3>
-    <div class="team-list" id="teamList"></div>
-  </div>
-</aside>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
+        <h3 style="margin:0; font-size:1rem; color:var(--accent2);">👥 Team Panel</h3>
+        <button id="closeSidebarBtn" style="background:none; border:none; color:var(--text); font-size:1.8rem; cursor:pointer; padding:0 8px; line-height:1;">✕</button>
+      </div>
+      <div class="sidebar-section">
+        <h3>📊 My Ride</h3>
+        <div class="my-stats">
+          <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
+          <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
+          <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
+          <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
+          <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
+            style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
+                   padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
+        </div>
+        <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
+          📍 Set manual location
+        </button>
+        <!-- Firebase test button removed (optional) -->
+      </div>
+      <div class="sidebar-section" style="flex:1; overflow-y:auto;">
+        <h3>👥 Team (<span id="teamCount">0</span>)</h3>
+        <div class="team-list" id="teamList"></div>
+        <!-- Admin controls will be injected here by JavaScript if user is leader -->
+        <div id="adminPanel" style="display:none;" class="admin-section"></div>
+      </div>
+    </aside>
 
     <div class="map-container">
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
@@ -271,9 +299,10 @@
     </div>
   </div>
   <div id="toastContainer"></div>
+  <!-- Modal for team creation/join will be injected by JavaScript -->
 
-<script>
-      (function() {
+  <script>
+    (function() {
       // ============================================================
       // 1. 🔥 FIREBASE CONFIG
       // ============================================================
@@ -291,26 +320,7 @@
       const database = firebase.database();
 
       // ============================================================
-      // 2. 🔑 JOIN A TEAM (Case-Insensitive!)
-      // ============================================================
-      let teamCode = localStorage.getItem('biketeam_teamcode');
-      if (!teamCode) {
-        teamCode = prompt('🔑 Enter Team Code (e.g., "Race1"):', 'Race1');
-        if (teamCode) {
-          teamCode = teamCode.trim().toLowerCase().replace(/\s/g, '_');
-          localStorage.setItem('biketeam_teamcode', teamCode);
-        } else {
-          teamCode = 'defaultteam';
-        }
-      } else {
-        teamCode = teamCode.trim().toLowerCase().replace(/\s/g, '_');
-        localStorage.setItem('biketeam_teamcode', teamCode);
-      }
-
-      console.log(`✅ Joined Team: ${teamCode}`);
-
-      // ============================================================
-      // 3. 🔥 FIX #1: PERSISTENT USER ID (No more random new user on refresh!)
+      // 2. PERSISTENT USER ID
       // ============================================================
       let myUserId = localStorage.getItem('biketeam_userid');
       if (!myUserId) {
@@ -320,7 +330,7 @@
       console.log(`🆔 Persistent User ID: ${myUserId}`);
 
       // ============================================================
-      // 4. STATE
+      // 3. STATE
       // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
@@ -339,6 +349,8 @@
       let myCurrentAltitude = null;
       let geoWatchId = null;
       let useManualLocation = false;
+      let teamCode = null;          // will be set after team selection
+      let isLeader = false;         // will be set after we read meta
 
       const remoteUsers = {};
 
@@ -349,62 +361,310 @@
       let userMarker = null;
       let userTrailPolyline = null;
 
+      // DOM refs
+      const $sidebar = document.getElementById('sidebar');
+      const $toggleSidebar = document.getElementById('toggleSidebar');
+      const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
+      const $teamList = document.getElementById('teamList');
+      const $teamCount = document.getElementById('teamCount');
+      const $adminPanel = document.getElementById('adminPanel');
+      const $toastContainer = document.getElementById('toastContainer');
+      const $statusDot = document.getElementById('statusDot');
+      const $statusText = document.getElementById('statusText');
+      const $btnStart = document.getElementById('btnStart');
+      const $btnStop = document.getElementById('btnStop');
+      const $myNameInput = document.getElementById('myNameInput');
+      const $btnManualLocation = document.getElementById('btnManualLocation');
+      const $manualBtn = document.getElementById('manualBtn');
+      const $followBtn = document.getElementById('followBtn');
+      const $locateBtn = document.getElementById('locateBtn');
+
+      const $mySpeed = document.getElementById('mySpeed');
+      const $myDistance = document.getElementById('myDistance');
+      const $myElapsed = document.getElementById('myElapsed');
+      const $myAltitude = document.getElementById('myAltitude');
+      const $miniSpeed = document.getElementById('miniSpeed');
+      const $miniDist = document.getElementById('miniDist');
+      const $miniTime = document.getElementById('miniTime');
+
       // ============================================================
-      // 5. 🔥 FIX #2: USERNAME VALIDATION (Claim a name in the team)
+      // 4. MODAL (Team creation / join)
       // ============================================================
-      function validateAndSetUsername(newName) {
-        if (!newName || newName.trim() === '') {
-          showToast('⚠️ Name cannot be empty.', true);
+      function showModal() {
+        return new Promise((resolve) => {
+          const overlay = document.createElement('div');
+          overlay.className = 'modal-overlay';
+          overlay.id = 'teamModal';
+          overlay.innerHTML = `
+            <div class="modal-box">
+              <h2>🚴 Join or Create Team</h2>
+              <p style="text-align:center; color:var(--text-secondary); margin-bottom:12px; font-size:0.9rem;">
+                To start tracking, join an existing team or create your own.
+              </p>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <button id="modalCreateBtn" class="btn btn-start" style="width:100%;">✨ Create New Team</button>
+                <button id="modalJoinBtn" class="btn btn-outline" style="width:100%;">🔑 Join Existing Team</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          overlay.querySelector('#modalCreateBtn').onclick = () => {
+            overlay.remove();
+            resolve('create');
+          };
+          overlay.querySelector('#modalJoinBtn').onclick = () => {
+            overlay.remove();
+            resolve('join');
+          };
+        });
+      }
+
+      // Create team flow
+      async function createTeam() {
+        const teamName = prompt('👑 Enter a name for your new team (e.g., "Sunday Riders"):', 'My Team');
+        if (!teamName) return false;
+        const trimmed = teamName.trim();
+        if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
+
+        // Generate a unique 4-digit code
+        let code = '';
+        let attempts = 0;
+        while (attempts < 50) {
+          const candidate = String(Math.floor(1000 + Math.random() * 9000));
+          const snap = await database.ref('teamCodes/' + candidate).once('value');
+          if (!snap.exists()) {
+            code = candidate;
+            break;
+          }
+          attempts++;
+        }
+        if (!code) { showToast('Could not generate a unique code. Please try again.', true); return false; }
+
+        // Create team metadata
+        const teamCodeRaw = 'team_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,6);
+        const teamCodeClean = teamCodeRaw.toLowerCase().replace(/[^a-z0-9_]/g, '');
+        const leaderId = myUserId;
+        const leaderName = myName;
+
+        const updates = {};
+        updates['teams/' + teamCodeClean + '/_meta'] = {
+          leaderId: leaderId,
+          leaderName: leaderName,
+          teamName: trimmed,
+          createdAt: Date.now()
+        };
+        updates['teamCodes/' + code] = {
+          teamCode: teamCodeClean,
+          leaderId: leaderId,
+          leaderName: leaderName,
+          teamName: trimmed,
+          createdAt: Date.now()
+        };
+
+        try {
+          await database.ref().update(updates);
+          // Save teamCode and leader flag
+          teamCode = teamCodeClean;
+          isLeader = true;
+          localStorage.setItem('biketeam_teamcode', teamCode);
+          localStorage.setItem('biketeam_isLeader', 'true');
+          showToast(`✅ Team "${trimmed}" created! Share code: ${code}`);
+          // Now start the app with this team
+          startAppWithTeam();
+          return true;
+        } catch (e) {
+          showToast('❌ Error creating team: ' + e.message, true);
           return false;
         }
-        const trimmedName = newName.trim();
-        
-        // Check if this name is already taken by SOMEONE ELSE in this team
-        return database.ref('teams/' + teamCode)
-          .orderByChild('userName')
-          .equalTo(trimmedName)
-          .once('value')
-          .then((snapshot) => {
-            let taken = false;
-            snapshot.forEach((childSnapshot) => {
-              const data = childSnapshot.val();
-              // If the user ID matches MINE, it's ME, so it's allowed.
-              if (childSnapshot.key !== myUserId) {
-                taken = true;
-              }
-            });
+      }
 
-            if (taken) {
-              showToast(`❌ Username "${trimmedName}" is already taken in this team!`, true);
-              // Revert the input field to the old valid name
-              $myNameInput.value = myName;
-              return false;
-            } else {
-              // Name is free! Save it.
-              myName = trimmedName;
-              localStorage.setItem('biketeam_myname', myName);
-              updateTeamList();
-              broadcastMyPosition();
-              if (userMarker) {
-                userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
-              }
-              showToast(`✅ Username set to "${myName}"`);
-              return true;
-            }
-          }).catch((error) => {
-            console.error('Validation error:', error);
-            showToast('⚠️ Could not validate name. Check Firebase rules.', true);
-            return false;
-          });
+      // Join team flow
+      async function joinTeam() {
+        const codeInput = prompt('🔑 Enter the 4‑digit team code provided by the leader:', '');
+        if (codeInput === null) return false;
+        const code = codeInput.trim();
+        if (!/^\d{4}$/.test(code)) {
+          showToast('Please enter a valid 4‑digit numeric code.', true);
+          return false;
+        }
+
+        const snap = await database.ref('teamCodes/' + code).once('value');
+        const data = snap.val();
+        if (!data) {
+          showToast('❌ No team found with that code. Please check with your leader.', true);
+          return false;
+        }
+
+        // Join this team
+        teamCode = data.teamCode;
+        isLeader = false;
+        localStorage.setItem('biketeam_teamcode', teamCode);
+        localStorage.removeItem('biketeam_isLeader');
+        showToast(`✅ Joined team "${data.teamName || 'Unnamed'}"!`);
+        startAppWithTeam();
+        return true;
       }
 
       // ============================================================
-      // 6. FIREBASE SYNC
+      // 5. START APP AFTER TEAM IS SET
       // ============================================================
-      const myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
+      let appStarted = false;
+
+      function startAppWithTeam() {
+        if (appStarted) return;
+        appStarted = true;
+
+        console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
+        // Now continue with initialization
+        initMap();
+        $myNameInput.value = myName;
+
+        // Sidebar behavior
+        if (window.innerWidth <= 768) {
+          $sidebar.classList.add('hidden');
+          $sidebar.style.transform = 'translateX(-100%)';
+        } else {
+          $sidebar.classList.remove('hidden');
+        }
+
+        // Start GPS
+        const geoStarted = startGeolocation();
+        if (!geoStarted && !useManualLocation) {
+          if (!myLastPosition) {
+            map.setView([40.7128, -74.006], 14);
+            $statusText.textContent = 'NO GPS';
+            $statusDot.style.background = 'var(--warning)';
+            $statusDot.style.animation = 'none';
+          }
+        }
+
+        // Set up Firebase listeners
+        setupFirebaseListeners();
+        updateTeamList();
+        setInterval(updateMyStats, 1000);
+        console.log(`✅ BikeTeam started. Team: ${teamCode}, Your ID: ${myUserId}`);
+        showToast(`🔑 Team: ${teamCode}`);
+
+        // Validate username on startup
+        setTimeout(() => {
+          validateAndSetUsername(myName);
+        }, 1000);
+
+        // Test Firebase after 3 seconds
+        setTimeout(testFirebaseConnection, 3000);
+
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then(() => console.log('✅ Service Worker registered'))
+              .catch((err) => console.error('❌ Service Worker error:', err));
+          });
+        }
+      }
+
+      // ============================================================
+      // 6. FIREBASE LISTENERS (only after teamCode is known)
+      // ============================================================
+      let locationsRef = null;
+      let myLocationRef = null;
+
+      function setupFirebaseListeners() {
+        if (!teamCode) return;
+        myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
+        locationsRef = database.ref('teams/' + teamCode);
+
+        // Listen for changes in the team
+        locationsRef.on('child_added', (snapshot) => {
+          if (snapshot.key === myUserId) return;
+          if (snapshot.key === '_meta') {
+            // Check if we are still leader
+            const meta = snapshot.val();
+            if (meta && meta.leaderId === myUserId) {
+              isLeader = true;
+              localStorage.setItem('biketeam_isLeader', 'true');
+              updateAdminPanel();
+            } else {
+              isLeader = false;
+              localStorage.removeItem('biketeam_isLeader');
+              updateAdminPanel();
+            }
+            return;
+          }
+          remoteUsers[snapshot.key] = snapshot.val();
+          updateRemoteMarkers();
+          updateTeamList();
+          showToast(`👋 ${remoteUsers[snapshot.key]?.userName || 'Rider'} joined!`);
+        });
+
+        locationsRef.on('child_changed', (snapshot) => {
+          if (snapshot.key === myUserId) return;
+          if (snapshot.key === '_meta') {
+            // Check leadership change
+            const meta = snapshot.val();
+            if (meta && meta.leaderId === myUserId) {
+              isLeader = true;
+              localStorage.setItem('biketeam_isLeader', 'true');
+            } else {
+              isLeader = false;
+              localStorage.removeItem('biketeam_isLeader');
+            }
+            updateAdminPanel();
+            return;
+          }
+          if (remoteUsers[snapshot.key]) {
+            remoteUsers[snapshot.key] = { ...remoteUsers[snapshot.key], ...snapshot.val() };
+          } else {
+            remoteUsers[snapshot.key] = snapshot.val();
+          }
+          updateRemoteMarkers();
+          updateTeamList();
+        });
+
+        locationsRef.on('child_removed', (snapshot) => {
+          const uid = snapshot.key;
+          if (uid === '_meta') return;
+          if (uid === myUserId) {
+            // I've been kicked! Clear team and reload.
+            showToast('❌ You have been removed from the team by the leader.', true);
+            localStorage.removeItem('biketeam_teamcode');
+            localStorage.removeItem('biketeam_isLeader');
+            location.reload();
+            return;
+          }
+          if (remoteUsers[uid] && remoteUsers[uid]._marker) {
+            markerLayerGroup.removeLayer(remoteUsers[uid]._marker);
+            if (remoteUsers[uid]._trail) trailLayerGroup.removeLayer(remoteUsers[uid]._trail);
+          }
+          delete remoteUsers[uid];
+          updateTeamList();
+        });
+
+        // Stale check
+        setInterval(() => {
+          const now = Date.now();
+          let updated = false;
+          for (const uid in remoteUsers) {
+            const u = remoteUsers[uid];
+            const stale = (now - (u.timestamp || 0)) > STALE_THRESHOLD_MS;
+            if (stale && !u._offline) {
+              u._offline = true;
+              updated = true;
+            } else if (!stale && u._offline) {
+              u._offline = false;
+              updated = true;
+            }
+          }
+          if (updated) {
+            updateRemoteMarkers();
+            updateTeamList();
+          }
+        }, 5000);
+      }
 
       function broadcastMyPosition() {
-        if (!myLastPosition) return;
+        if (!myLastPosition || !myLocationRef) return;
         const data = {
           userId: myUserId,
           userName: myName,
@@ -417,68 +677,94 @@
           isTracking: isTracking,
           routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS)
         };
-        
         myLocationRef.set(data).catch((error) => {
           console.error('❌ Firebase write error:', error);
           showToast('❌ Firebase Error: ' + error.message, true);
-          $statusText.textContent = 'DB ERROR';
-          $statusDot.style.background = 'var(--danger)';
-          $statusDot.style.animation = 'none';
         });
       }
 
-      const locationsRef = database.ref('teams/' + teamCode);
-      locationsRef.on('child_added', (snapshot) => {
-        if (snapshot.key === myUserId) return;
-        remoteUsers[snapshot.key] = snapshot.val();
-        updateRemoteMarkers();
-        updateTeamList();
-        showToast(`👋 ${remoteUsers[snapshot.key]?.userName || 'Rider'} joined!`);
-      });
+      // ============================================================
+      // 7. LEADER ACTIONS: KICK & DELETE
+      // ============================================================
+      function kickUser(userId, userName) {
+        if (!isLeader) return;
+        if (userId === myUserId) return;
+        if (!confirm(`Kick ${userName} from the team?`)) return;
+        const userRef = database.ref('teams/' + teamCode + '/' + userId);
+        userRef.remove().then(() => {
+          showToast(`👢 ${userName} has been kicked.`);
+        }).catch((e) => {
+          showToast('❌ Error kicking user: ' + e.message, true);
+        });
+      }
 
-      locationsRef.on('child_changed', (snapshot) => {
-        if (snapshot.key === myUserId) return;
-        if (remoteUsers[snapshot.key]) {
-          remoteUsers[snapshot.key] = { ...remoteUsers[snapshot.key], ...snapshot.val() };
-        } else {
-          remoteUsers[snapshot.key] = snapshot.val();
-        }
-        updateRemoteMarkers();
-        updateTeamList();
-      });
-
-      locationsRef.on('child_removed', (snapshot) => {
-        const uid = snapshot.key;
-        if (remoteUsers[uid] && remoteUsers[uid]._marker) {
-          markerLayerGroup.removeLayer(remoteUsers[uid]._marker);
-          if (remoteUsers[uid]._trail) trailLayerGroup.removeLayer(remoteUsers[uid]._trail);
-        }
-        delete remoteUsers[uid];
-        updateTeamList();
-      });
-
-      setInterval(() => {
-        const now = Date.now();
-        let updated = false;
-        for (const uid in remoteUsers) {
-          const u = remoteUsers[uid];
-          const stale = (now - (u.timestamp || 0)) > STALE_THRESHOLD_MS;
-          if (stale && !u._offline) {
-            u._offline = true;
-            updated = true;
-          } else if (!stale && u._offline) {
-            u._offline = false;
-            updated = true;
-          }
-        }
-        if (updated) {
-          updateRemoteMarkers();
-          updateTeamList();
-        }
-      }, 5000);
+      function deleteTeam() {
+        if (!isLeader) return;
+        if (!confirm('⚠️ Are you sure you want to delete the entire team? This cannot be undone!')) return;
+        // Find the team code entry to delete too
+        const codeRef = database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode);
+        codeRef.once('value').then((snap) => {
+          const updates = {};
+          snap.forEach((child) => {
+            updates['teamCodes/' + child.key] = null;
+          });
+          updates['teams/' + teamCode] = null;
+          return database.ref().update(updates);
+        }).then(() => {
+          showToast('🗑️ Team deleted.');
+          localStorage.removeItem('biketeam_teamcode');
+          localStorage.removeItem('biketeam_isLeader');
+          location.reload();
+        }).catch((e) => {
+          showToast('❌ Error deleting team: ' + e.message, true);
+        });
+      }
 
       // ============================================================
-      // 7. MAP
+      // 8. VALIDATE USERNAME (with team scope)
+      // ============================================================
+      function validateAndSetUsername(newName) {
+        if (!newName || newName.trim() === '') {
+          showToast('⚠️ Name cannot be empty.', true);
+          return false;
+        }
+        const trimmed = newName.trim();
+        if (!teamCode) return false;
+
+        return database.ref('teams/' + teamCode)
+          .orderByChild('userName')
+          .equalTo(trimmed)
+          .once('value')
+          .then((snapshot) => {
+            let taken = false;
+            snapshot.forEach((childSnapshot) => {
+              if (childSnapshot.key !== myUserId && childSnapshot.key !== '_meta') {
+                taken = true;
+              }
+            });
+            if (taken) {
+              showToast(`❌ Username "${trimmed}" is already taken in this team!`, true);
+              $myNameInput.value = myName;
+              return false;
+            } else {
+              myName = trimmed;
+              localStorage.setItem('biketeam_myname', myName);
+              updateTeamList();
+              broadcastMyPosition();
+              if (userMarker) {
+                userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+              }
+              showToast(`✅ Username set to "${myName}"`);
+              return true;
+            }
+          }).catch((e) => {
+            console.error('Validation error:', e);
+            return false;
+          });
+      }
+
+      // ============================================================
+      // 9. MAP & GEOLOCATION (same as before, minor tweaks)
       // ============================================================
       function initMap() {
         map = L.map('map', {
@@ -502,7 +788,7 @@
           if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
         });
 
-        // Close sidebar on map click (mobile only)
+        // Close sidebar on map click (mobile)
         map.on('click', () => {
           if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
             $sidebar.classList.add('hidden');
@@ -511,9 +797,6 @@
         });
       }
 
-      // ============================================================
-      // 8. GEOLOCATION
-      // ============================================================
       function startGeolocation() {
         if (useManualLocation) return false;
         if (!navigator.geolocation) {
@@ -588,7 +871,7 @@
       }
 
       // ============================================================
-      // 9. MANUAL LOCATION
+      // 10. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
         stopGeolocation();
@@ -621,16 +904,14 @@
       }
 
       // ============================================================
-      // 10. HELPERS
+      // 11. HELPERS
       // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) ** 2 +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon / 2) ** 2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       }
 
       function createCustomIcon(emoji, color, isYou = false) {
@@ -640,8 +921,8 @@
           html: `<div class="custom-marker${isYou ? ' you-marker' : ''}" style="background:${color};width:${size}px;height:${size}px;font-size:${fontSize};">${emoji}</div>`,
           className: '',
           iconSize: [size, size + 20],
-          iconAnchor: [size / 2, size / 2 + 10],
-          popupAnchor: [0, -size / 2]
+          iconAnchor: [size/2, size/2 + 10],
+          popupAnchor: [0, -size/2]
         });
       }
 
@@ -655,9 +936,7 @@
         } else {
           userMarker.setLatLng([lat, lng]);
         }
-        userMarker.setPopupContent(
-          `<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`
-        );
+        userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
       }
 
       function updateMyTrail() {
@@ -685,9 +964,7 @@
           } else {
             u._marker.setLatLng([u.lat, u.lng]);
             u._marker.setOpacity(isOffline ? 0.5 : 1);
-            u._marker.setPopupContent(
-              `<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
-            );
+            u._marker.setPopupContent(`<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
           }
           if (u.routePoints && u.routePoints.length >= 2) {
             if (!u._trail) {
@@ -706,7 +983,7 @@
       }
 
       // ============================================================
-      // 11. UI UPDATES
+      // 12. UI UPDATES
       // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
@@ -724,18 +1001,14 @@
       }
 
       function formatDuration(sec) {
-        const h = Math.floor(sec / 3600);
-        const m = Math.floor((sec % 3600) / 60);
-        const s = Math.floor(sec % 60);
-        return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+        return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
       }
 
       function estimateRouteDistance(pts) {
         if (!pts || pts.length < 2) return 0;
         let d = 0;
-        for (let i = 1; i < pts.length; i++) {
-          d += haversineDistance(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
-        }
+        for (let i = 1; i < pts.length; i++) d += haversineDistance(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
         return d;
       }
 
@@ -770,22 +1043,70 @@
           });
         }
 
-        document.getElementById('teamCount').textContent = members.length - 1;
+        $teamCount.textContent = members.length - 1;
 
         if (members.length <= 1) {
-          $teamList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders in "' + teamCode + '"...</div>';
+          $teamList.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders in "${teamCode}"...</div>`;
         } else {
-          $teamList.innerHTML = members.map(m => `
-            <div class="member-card${m.isYou ? ' you' : ''}${!m.isActive ? ' offline' : ''}" onclick="window.highlightUser('${m.id}')">
-              <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
-              <div class="member-info">
-                <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''}</div>
-                <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
+          $teamList.innerHTML = members.map(m => {
+            const isLeaderBadge = isLeader && m.id !== myUserId ? '' : ''; // we show leader badge only on self? Actually show leader badge on leader's own card.
+            const leaderBadge = (m.id === myUserId && isLeader) ? '<span class="badge-leader">👑 LEADER</span>' : '';
+            return `
+              <div class="member-card${m.isYou ? ' you' : ''}${!m.isActive ? ' offline' : ''}" onclick="window.highlightUser('${m.id}')">
+                <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
+                <div class="member-info">
+                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge}</div>
+                  <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
+                </div>
+                <span class="member-status ${m.isActive ? 'status-active' : 'status-inactive'}">${m.isActive ? 'LIVE' : 'AWAY'}</span>
               </div>
-              <span class="member-status ${m.isActive ? 'status-active' : 'status-inactive'}">${m.isActive ? 'LIVE' : 'AWAY'}</span>
-            </div>
-          `).join('');
+            `;
+          }).join('');
         }
+
+        // Update admin panel if leader
+        updateAdminPanel();
+      }
+
+      function updateAdminPanel() {
+        if (!isLeader) {
+          $adminPanel.style.display = 'none';
+          return;
+        }
+        $adminPanel.style.display = 'block';
+        // Build admin controls
+        let html = `<div class="admin-title">👑 Team Admin</div>`;
+        // List members with kick buttons
+        const members = [];
+        for (const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          members.push({ id: uid, name: u.userName || 'Rider' });
+        }
+        if (members.length > 0) {
+          html += `<div style="margin-bottom:6px; font-size:0.75rem; color:var(--text-secondary);">Kick a member:</div>`;
+          members.forEach(m => {
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
+              <span style="font-size:0.8rem;">${escapeHtml(m.name)}</span>
+              <button class="admin-btn" data-uid="${m.id}" data-name="${escapeHtml(m.name)}">Kick</button>
+            </div>`;
+          });
+        } else {
+          html += `<div style="color:var(--text-secondary); font-size:0.7rem;">No other members.</div>`;
+        }
+        html += `<div style="margin-top:10px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🗑️ Delete Entire Team</button></div>`;
+        $adminPanel.innerHTML = html;
+
+        // Attach kick events
+        $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const uid = btn.dataset.uid;
+            const name = btn.dataset.name;
+            kickUser(uid, name);
+          };
+        });
+        const delBtn = document.getElementById('deleteTeamBtn');
+        if (delBtn) delBtn.onclick = deleteTeam;
       }
 
       window.highlightUser = function(uid) {
@@ -801,7 +1122,7 @@
       };
 
       // ============================================================
-      // 12. TRACKING CONTROLS
+      // 13. TRACKING CONTROLS
       // ============================================================
       function startTracking() {
         if (!myLastPosition) {
@@ -858,53 +1179,22 @@
       }
 
       // ============================================================
-      // 13. TEST FIREBASE CONNECTION
+      // 14. TEST FIREBASE
       // ============================================================
       function testFirebaseConnection() {
+        if (!teamCode) return;
         const testRef = database.ref('teams/' + teamCode + '/_test');
-        testRef.set({
-          test: 'ping',
-          time: Date.now(),
-          device: myUserId
-        }).then(() => {
-          showToast('✅ Firebase Connection: SUCCESS!');
-          testRef.remove();
-        }).catch((error) => {
-          showToast('❌ Firebase ERROR: ' + error.message, true);
-          alert('🔥 FIREBASE BLOCKED!\n\n' + error.message + '\n\nSOLUTION:\n1. Go to Firebase Console -> Realtime Database -> Rules\n2. Set rules to:\n{ "rules": { ".read": true, ".write": true } }\n3. Click Publish.');
-        });
+        testRef.set({ test: 'ping', time: Date.now(), device: myUserId })
+          .then(() => { showToast('✅ Firebase Connection: SUCCESS!'); testRef.remove(); })
+          .catch((error) => {
+            showToast('❌ Firebase ERROR: ' + error.message, true);
+            alert('🔥 FIREBASE BLOCKED!\n\n' + error.message + '\n\nSOLUTION:\n1. Go to Firebase Console -> Realtime Database -> Rules\n2. Set rules to:\n{ "rules": { ".read": true, ".write": true } }\n3. Click Publish.');
+          });
       }
 
       // ============================================================
-      // 14. EVENT LISTENERS
+      // 15. EVENT LISTENERS
       // ============================================================
-      const $btnStart = document.getElementById('btnStart');
-      const $btnStop = document.getElementById('btnStop');
-      const $statusDot = document.getElementById('statusDot');
-      const $statusText = document.getElementById('statusText');
-      const $myNameInput = document.getElementById('myNameInput');
-      const $teamList = document.getElementById('teamList');
-      const $sidebar = document.getElementById('sidebar');
-      const $toggleSidebar = document.getElementById('toggleSidebar');
-      const $toastContainer = document.getElementById('toastContainer');
-      const $followBtn = document.getElementById('followBtn');
-      const $locateBtn = document.getElementById('locateBtn');
-      const $btnManualLocation = document.getElementById('btnManualLocation');
-      const $manualBtn = document.getElementById('manualBtn');
-      const $btnCheckFirebase = document.getElementById('btnCheckFirebase');
-
-      const $mySpeed = document.getElementById('mySpeed');
-      const $myDistance = document.getElementById('myDistance');
-      const $myElapsed = document.getElementById('myElapsed');
-      const $myAltitude = document.getElementById('myAltitude');
-      const $miniSpeed = document.getElementById('miniSpeed');
-      const $miniDist = document.getElementById('miniDist');
-      const $miniTime = document.getElementById('miniTime');
-
-      $btnStart.addEventListener('click', startTracking);
-      $btnStop.addEventListener('click', stopTracking);
-
-      // Toggle sidebar (☰)
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
         if (window.innerWidth <= 768) {
@@ -912,16 +1202,12 @@
         }
       });
 
-      // Close sidebar (✕)
-      const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
-      if ($closeSidebarBtn) {
-        $closeSidebarBtn.addEventListener('click', () => {
-          $sidebar.classList.add('hidden');
-          if (window.innerWidth <= 768) {
-            $sidebar.style.transform = 'translateX(-100%)';
-          }
-        });
-      }
+      $closeSidebarBtn.addEventListener('click', () => {
+        $sidebar.classList.add('hidden');
+        if (window.innerWidth <= 768) {
+          $sidebar.style.transform = 'translateX(-100%)';
+        }
+      });
 
       $followBtn.addEventListener('click', () => {
         followMode = true;
@@ -940,20 +1226,20 @@
 
       $btnManualLocation.addEventListener('click', promptManualLocation);
       $manualBtn.addEventListener('click', promptManualLocation);
-      $btnCheckFirebase.addEventListener('click', testFirebaseConnection);
+      $btnStart.addEventListener('click', startTracking);
+      $btnStop.addEventListener('click', stopTracking);
 
-      // 🔥 FIXED: Validate username when user types or pastes
+      // Username validation
       $myNameInput.addEventListener('change', function() {
         const newName = this.value.trim();
         if (newName && newName !== myName) {
           validateAndSetUsername(newName);
         } else if (!newName) {
           showToast('⚠️ Name cannot be empty.', true);
-          this.value = myName; // revert
+          this.value = myName;
         }
       });
 
-      // Also validate on Enter key
       $myNameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -980,74 +1266,67 @@
         }
       });
 
+      // Periodic broadcast
       setInterval(() => {
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
       // ============================================================
-      // 15. INIT
+      // 16. INIT – Team selection first
       // ============================================================
-      function init() {
-        initMap(); // Map loads here
-        
-        $myNameInput.value = myName;
-        if (window.innerWidth <= 768) {
-          $sidebar.classList.add('hidden');
-          $sidebar.style.transform = 'translateX(-100%)';
-        } else {
-          $sidebar.classList.remove('hidden');
-        }
-
-        const geoStarted = startGeolocation();
-        if (!geoStarted && !useManualLocation) {
-          if (!myLastPosition) {
-            map.setView([40.7128, -74.006], 14);
-            $statusText.textContent = 'NO GPS';
-            $statusDot.style.background = 'var(--warning)';
-            $statusDot.style.animation = 'none';
+      async function init() {
+        // Check if we already have a teamCode stored
+        let storedTeamCode = localStorage.getItem('biketeam_teamcode');
+        if (storedTeamCode) {
+          // Validate that the team still exists and we are a member
+          const metaSnap = await database.ref('teams/' + storedTeamCode + '/_meta').once('value');
+          if (metaSnap.exists()) {
+            teamCode = storedTeamCode;
+            const meta = metaSnap.val();
+            if (meta.leaderId === myUserId) {
+              isLeader = true;
+              localStorage.setItem('biketeam_isLeader', 'true');
+            } else {
+              isLeader = false;
+              localStorage.removeItem('biketeam_isLeader');
+            }
+            // Check if we are still in the team (our node exists)
+            const mySnap = await database.ref('teams/' + teamCode + '/' + myUserId).once('value');
+            if (!mySnap.exists()) {
+              // We were kicked or removed
+              showToast('You are no longer in this team.', true);
+              localStorage.removeItem('biketeam_teamcode');
+              localStorage.removeItem('biketeam_isLeader');
+              location.reload();
+              return;
+            }
+            startAppWithTeam();
+            return;
+          } else {
+            // Team no longer exists
+            localStorage.removeItem('biketeam_teamcode');
+            localStorage.removeItem('biketeam_isLeader');
+            // fall through to create/join
           }
         }
 
-        updateTeamList();
-        setInterval(updateMyStats, 1000);
-        console.log(`✅ BikeTeam started. Team: ${teamCode}, Your ID: ${myUserId}`);
-        showToast(`🔑 Joined Team: ${teamCode}`);
-        
-        // 🔥 FIX #3: Validate the existing username on startup!
-        // This ensures if someone else took our name while we were offline, we get kicked.
-        setTimeout(() => {
-          validateAndSetUsername(myName);
-        }, 1000);
-        
-        // Auto-test Firebase after 3 seconds
-        setTimeout(testFirebaseConnection, 3000);
+        // No valid team: show modal
+        const choice = await showModal();
+        if (choice === 'create') {
+          await createTeam();
+        } else if (choice === 'join') {
+          await joinTeam();
+        }
+        // If both failed, retry
+        if (!teamCode) {
+          showToast('Team selection failed. Please refresh.', true);
+          location.reload();
+        }
       }
 
       init();
 
-      // ============================================================
-      // 16. 🚀 SERVICE WORKER REGISTRATION (FIX for "no running service worker")
-      // ============================================================
-      if ('serviceWorker' in navigator) {
-        // Add a small delay to ensure the page is fully loaded
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('✅ Service Worker registered successfully! Scope:', registration.scope);
-              showToast('📲 App can now be installed!');
-            })
-            .catch((error) => {
-              console.error('❌ Service Worker registration failed:', error);
-              // Common reasons: 404 (file missing), or serving from wrong path.
-              // If it fails, check if /sw.js exists in your Render root folder.
-              showToast('⚠️ Service Worker failed. Check console for details.', true);
-            });
-        });
-      } else {
-        console.warn('⚠️ Service Workers are not supported in this browser.');
-      }
-
     })();
-</script>
+  </script>
 </body>
 </html>
