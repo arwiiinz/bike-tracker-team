@@ -1,28 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <base href="/">
-   <!-- iOS / Apple Touch Icons -->
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-<link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120.png" />
-<link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152.png" />
-<link rel="apple-touch-icon" sizes="167x167" href="/apple-icon-167.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-
-<!-- iOS Splash Screen Status Bar -->
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="BikeTeam" />
   <meta charset="UTF-8">
+  <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🚴 BikeTeam Tracker – Live Cycling Monitor</title>
-  <!-- Leaflet -->
+  
+  <!-- PWA / iOS / Windows Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BikeTeam">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="msapplication-TileColor" content="#1a1a2e">
+  <meta name="msapplication-TileImage" content="/icon-144.png">
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-   <link rel="manifest" href="/manifest.json">
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <style>
     /* ===== YOUR EXISTING STYLES (unchanged) ===== */
     :root {
@@ -189,7 +188,7 @@
     @keyframes slideIn { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
     @keyframes slideOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(120%); opacity:0; } }
 
-    /* MODAL (for team creation/join) */
+    /* MODAL */
     .modal-overlay {
       position: fixed; top:0; left:0; width:100%; height:100%;
       background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
@@ -253,6 +252,33 @@
     .admin-section .admin-title { color: var(--warning); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
     .admin-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; cursor: pointer; }
     .admin-btn:hover { background: var(--danger); color: #fff; }
+    
+    /* Status dropdown styling */
+    #statusSelect {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+    }
+    #statusSelect option { background: var(--panel); }
+    
+    /* Route controls */
+    .route-controls { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+    .route-controls label { font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+    #gpxFileInput {
+      width: 100%; padding: 4px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; color: var(--text); font-size: 0.7rem;
+    }
+    #routeSelector {
+      width: 100%; background: var(--card); border: 1px solid var(--border);
+      color: var(--text); padding: 6px 10px; border-radius: 20px;
+      font-size: 0.75rem; outline: none; font-family: inherit;
+    }
   </style>
 </head>
 <body>
@@ -280,31 +306,25 @@
           <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
           <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
         </div>
-        <div style="margin-top:10px; display:flex; gap:6px; align-items:center;">
+        <div style="margin-top:10px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
-            style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
+            style="flex:2; min-width:120px; background:var(--card); border:1px solid var(--border); color:var(--text);
                    padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
-
-           <div style="margin-top:8px;">
-  <label style="font-size:0.7rem; color:var(--text-secondary);">🚴 Status</label>
-  <select id="statusSelect" style="width:100%; background:var(--card); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
-    <option value="🟢 All Good">🟢 All Good</option>
-    <option value="⚠️ Flat Tire">⚠️ Flat Tire</option>
-    <option value="⚠️ Chain Break">⚠️ Chain Break</option>
-    <option value="⚠️ Mechanical Issue">⚠️ Mechanical Issue</option>
-    <option value="🆘 Need Help">🆘 Need Help</option>
-  </select>
-</div>
+          <select id="statusSelect" style="flex:1; min-width:100px;">
+            <option value="🟢 All Good">🟢 All Good</option>
+            <option value="⚠️ Flat Tire">⚠️ Flat Tire</option>
+            <option value="⚠️ Chain Break">⚠️ Chain Break</option>
+            <option value="⚠️ Mechanical Issue">⚠️ Mechanical Issue</option>
+            <option value="🆘 Need Help">🆘 Need Help</option>
+          </select>
         </div>
         <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
           📍 Set manual location
         </button>
-        <!-- Firebase test button removed (optional) -->
       </div>
       <div class="sidebar-section" style="flex:1; overflow-y:auto;">
         <h3>👥 Team (<span id="teamCount">0</span>)</h3>
         <div class="team-list" id="teamList"></div>
-        <!-- Admin controls will be injected here by JavaScript if user is leader -->
         <div id="adminPanel" style="display:none;" class="admin-section"></div>
       </div>
     </aside>
@@ -323,9 +343,9 @@
     </div>
   </div>
   <div id="toastContainer"></div>
-  <!-- Modal for team creation/join will be injected by JavaScript -->
-<script>
-      (function() {
+
+  <script>
+    (function() {
       // ============================================================
       // 1. 🔥 FIREBASE CONFIG
       // ============================================================
@@ -361,6 +381,7 @@
       const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
 
       let myName = localStorage.getItem('biketeam_myname') || 'Me';
+      let myStatus = localStorage.getItem('biketeam_mystatus') || '🟢 All Good';
       const myColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
 
       let isTracking = false;
@@ -381,11 +402,11 @@
       let followMode = true;
       const markerLayerGroup = L.layerGroup();
       const trailLayerGroup = L.layerGroup();
+      const routeLayerGroup = L.layerGroup(); // For shared routes
       let userMarker = null;
       let userTrailPolyline = null;
 
       // DOM refs
-         let myStatus = localStorage.getItem('biketeam_mystatus') || '🟢 All Good';
       const $sidebar = document.getElementById('sidebar');
       const $toggleSidebar = document.getElementById('toggleSidebar');
       const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
@@ -398,6 +419,7 @@
       const $btnStart = document.getElementById('btnStart');
       const $btnStop = document.getElementById('btnStop');
       const $myNameInput = document.getElementById('myNameInput');
+      const $statusSelect = document.getElementById('statusSelect');
       const $btnManualLocation = document.getElementById('btnManualLocation');
       const $manualBtn = document.getElementById('manualBtn');
       const $followBtn = document.getElementById('followBtn');
@@ -537,6 +559,7 @@
         console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
         initMap();
         $myNameInput.value = myName;
+        $statusSelect.value = myStatus;
 
         if (window.innerWidth <= 768) {
           $sidebar.classList.add('hidden');
@@ -587,6 +610,7 @@
         myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
         locationsRef = database.ref('teams/' + teamCode);
 
+        // Listen for users
         locationsRef.on('child_added', (snapshot) => {
           if (snapshot.key === myUserId) return;
           if (snapshot.key === '_meta') {
@@ -648,6 +672,56 @@
           updateTeamList();
         });
 
+        // --- ROUTE LISTENERS ---
+        // Listen for saved routes (to populate leader's dropdown)
+        const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+        savedRoutesRef.on('value', (snapshot) => {
+          const routes = snapshot.val();
+          const selector = document.getElementById('routeSelector');
+          if (selector) {
+            const currentVal = selector.value;
+            selector.innerHTML = '<option value="">-- None --</option>';
+            if (routes) {
+              Object.keys(routes).forEach(id => {
+                const route = routes[id];
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = route.name || 'Unnamed Route';
+                selector.appendChild(opt);
+              });
+            }
+            // Restore selected value if it still exists
+            if (currentVal && routes && routes[currentVal]) {
+              selector.value = currentVal;
+            }
+          }
+        });
+
+        // Listen for active route ID (shared across all users)
+        const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
+        activeRouteRef.on('value', (snapshot) => {
+          const activeId = snapshot.val();
+          routeLayerGroup.clearLayers();
+          if (activeId) {
+            database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
+              const route = snap.val();
+              if (route && route.points && route.points.length > 1) {
+                const polyline = L.polyline(route.points, { 
+                  color: '#ffd93d', 
+                  weight: 5, 
+                  opacity: 0.8, 
+                  dashArray: '10 6' 
+                });
+                polyline.addTo(routeLayerGroup);
+                // Optionally bind popup
+                polyline.bindPopup(`🗺️ ${route.name || 'Route'}`);
+                showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
+              }
+            });
+          }
+        });
+
+        // Stale user check
         setInterval(() => {
           const now = Date.now();
           let updated = false;
@@ -681,8 +755,8 @@
           color: myColor,
           timestamp: Date.now(),
           isTracking: isTracking,
-          routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS)
-            status: myStatus
+          routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS),
+          status: myStatus // 👈 Status added here
         };
         myLocationRef.set(data).catch((error) => {
           console.error('❌ Firebase write error:', error);
@@ -691,7 +765,7 @@
       }
 
       // ============================================================
-      // 7. LEADER ACTIONS: KICK & DELETE
+      // 7. LEADER ACTIONS: KICK, DELETE, ROUTE UPLOAD
       // ============================================================
       function kickUser(userId, userName) {
         if (!isLeader) return;
@@ -726,9 +800,45 @@
         });
       }
 
-      // ============================================================
-      // 8. NEW: LEAVE TEAM (for regular members)
-      // ============================================================
+      // Parse GPX
+      function parseGPX(gpxString) {
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(gpxString, 'text/xml');
+        const trkpts = xml.getElementsByTagName('trkpt');
+        const points = [];
+        for (let i = 0; i < trkpts.length; i++) {
+          const lat = parseFloat(trkpts[i].getAttribute('lat'));
+          const lon = parseFloat(trkpts[i].getAttribute('lon'));
+          if (!isNaN(lat) && !isNaN(lon)) {
+            points.push([lat, lon]);
+          }
+        }
+        return points;
+      }
+
+      function uploadRoute(file) {
+        if (!file) { showToast('Please select a GPX file.', true); return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const gpxText = e.target.result;
+          const points = parseGPX(gpxText);
+          if (points.length < 2) {
+            showToast('Invalid GPX file or no track points.', true);
+            return;
+          }
+          const routeRef = database.ref('teams/' + teamCode + '/savedRoutes').push();
+          routeRef.set({
+            name: file.name.replace(/\.[^/.]+$/, ""),
+            points: points,
+            createdAt: Date.now()
+          }).then(() => {
+            showToast('✅ Route uploaded!');
+          }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
+        };
+        reader.readAsText(file);
+      }
+
+      // Leave team
       function leaveTeam() {
         if (!teamCode) return;
         if (isLeader) {
@@ -749,7 +859,7 @@
       }
 
       // ============================================================
-      // 9. VALIDATE USERNAME
+      // 8. VALIDATE USERNAME
       // ============================================================
       function validateAndSetUsername(newName) {
         if (!newName || newName.trim() === '') {
@@ -780,7 +890,7 @@
               updateTeamList();
               broadcastMyPosition();
               if (userMarker) {
-                userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+                userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
               }
               showToast(`✅ Username set to "${myName}"`);
               return true;
@@ -792,7 +902,7 @@
       }
 
       // ============================================================
-      // 10. MAP & GEOLOCATION
+      // 9. MAP & GEOLOCATION
       // ============================================================
       function initMap() {
         map = L.map('map', {
@@ -809,6 +919,7 @@
 
         markerLayerGroup.addTo(map);
         trailLayerGroup.addTo(map);
+        routeLayerGroup.addTo(map); // Add route layer
 
         map.on('dragstart', () => { followMode = false; });
         map.on('dblclick', () => {
@@ -898,7 +1009,7 @@
       }
 
       // ============================================================
-      // 11. MANUAL LOCATION
+      // 10. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
         stopGeolocation();
@@ -931,7 +1042,7 @@
       }
 
       // ============================================================
-      // 12. HELPERS
+      // 11. HELPERS
       // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
@@ -963,7 +1074,7 @@
         } else {
           userMarker.setLatLng([lat, lng]);
         }
-        userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h`);
+        userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
       }
 
       function updateMyTrail() {
@@ -987,11 +1098,13 @@
               zIndexOffset: 500,
               opacity: isOffline ? 0.5 : 1
             }).addTo(markerLayerGroup);
-            u._marker.bindPopup(`<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h`);
+            u._marker.bindPopup(`<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${u.status || '🟢'}`);
           } else {
             u._marker.setLatLng([u.lat, u.lng]);
             u._marker.setOpacity(isOffline ? 0.5 : 1);
-            u._marker.setPopupContent(`<b>${escapeHtml(u.userName || 'Rider')}</b><br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
+            u._marker.setPopupContent(
+              `<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
+            );
           }
           if (u.routePoints && u.routePoints.length >= 2) {
             if (!u._trail) {
@@ -1010,7 +1123,7 @@
       }
 
       // ============================================================
-      // 13. UI UPDATES
+      // 12. UI UPDATES
       // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
@@ -1044,17 +1157,16 @@
         members.push({
           id: myUserId,
           name: myName,
-           
           color: myColor,
           speed: myCurrentSpeed,
           distance: myTotalDistance,
           isYou: true,
           isActive: isTracking || useManualLocation,
           isTracking: isTracking,
-          emoji: '🚴'
+          emoji: '🚴',
+          status: myStatus
         });
         for (const uid in remoteUsers) {
-           const statusEmoji = m.status || '🟢';
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
           members.push({
@@ -1066,7 +1178,8 @@
             isYou: false,
             isActive: active,
             isTracking: u.isTracking,
-            emoji: '🚴‍♂️'
+            emoji: '🚴‍♂️',
+            status: u.status || '🟢'
           });
         }
 
@@ -1081,7 +1194,7 @@
               <div class="member-card${m.isYou ? ' you' : ''}${!m.isActive ? ' offline' : ''}" onclick="window.highlightUser('${m.id}')">
                 <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
                 <div class="member-info">
-                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge} <span style="font-size:0.8rem;">${statusEmoji}</span></div>
+                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge} <span style="font-size:0.8rem;">${escapeHtml(m.status)}</span></div>
                   <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
                 </div>
                 <span class="member-status ${m.isActive ? 'status-active' : 'status-inactive'}">${m.isActive ? 'LIVE' : 'AWAY'}</span>
@@ -1094,7 +1207,7 @@
       }
 
       // ============================================================
-      // 14. 🔥 UPDATED ADMIN PANEL (Shows Code for Leader + Leave Button for Members)
+      // 13. 🔥 UPDATED ADMIN PANEL (Leader: Code + Routes | Member: Leave)
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -1106,7 +1219,7 @@
           // ---- LEADER VIEW ----
           $adminPanel.style.display = 'block';
           
-          // Fetch the team code from Firebase
+          // Fetch the team code
           let codeDisplay = 'Loading...';
           database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((snap) => {
             let foundCode = '';
@@ -1119,10 +1232,23 @@
 
           let html = `<div class="admin-title">👑 Team Admin</div>`;
           
-          // 🔥 SHOW THE 4-DIGIT CODE
+          // Show 4-digit code
           html += `<div style="background:var(--card); padding:8px 12px; border-radius:8px; margin-bottom:12px; text-align:center;">
             <span style="color:var(--text-secondary); font-size:0.7rem;">🔑 Share this code with your team</span><br>
             <span id="teamCodeDisplay" style="font-size:2rem; font-weight:bold; color:var(--accent2); letter-spacing:6px;">${codeDisplay}</span>
+          </div>`;
+
+          // Route Management
+          html += `<div class="route-controls">
+            <label>📂 Upload GPX Route</label>
+            <input type="file" id="gpxFileInput" accept=".gpx">
+            <button id="uploadRouteBtn" class="btn btn-outline btn-sm" style="width:100%; margin-top:4px;">⬆️ Upload Route</button>
+          </div>
+          <div class="route-controls">
+            <label>🗺️ Active Route (for whole team)</label>
+            <select id="routeSelector">
+              <option value="">-- None --</option>
+            </select>
           </div>`;
 
           // Member list with kick buttons
@@ -1132,20 +1258,40 @@
             members.push({ id: uid, name: u.userName || 'Rider' });
           }
           if (members.length > 0) {
-            html += `<div style="margin-bottom:6px; font-size:0.75rem; color:var(--text-secondary);">Kick a member:</div>`;
+            html += `<div style="margin-top:10px; border-top:1px solid var(--border); padding-top:8px;">
+              <div style="margin-bottom:6px; font-size:0.75rem; color:var(--text-secondary);">Kick a member:</div>`;
             members.forEach(m => {
               html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
                 <span style="font-size:0.8rem;">${escapeHtml(m.name)}</span>
                 <button class="admin-btn" data-uid="${m.id}" data-name="${escapeHtml(m.name)}">Kick</button>
               </div>`;
             });
+            html += `</div>`;
           } else {
-            html += `<div style="color:var(--text-secondary); font-size:0.7rem;">No other members.</div>`;
+            html += `<div style="color:var(--text-secondary); font-size:0.7rem; margin-top:8px;">No other members.</div>`;
           }
           html += `<div style="margin-top:10px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🗑️ Delete Entire Team</button></div>`;
           $adminPanel.innerHTML = html;
 
-          // Attach events
+          // --- Attach Leader Events ---
+          // Upload Route
+          const uploadBtn = document.getElementById('uploadRouteBtn');
+          const fileInput = document.getElementById('gpxFileInput');
+          if (uploadBtn && fileInput) {
+            uploadBtn.onclick = function() {
+              uploadRoute(fileInput.files[0]);
+            };
+          }
+
+          // Route Selector change (set active route)
+          const selector = document.getElementById('routeSelector');
+          if (selector) {
+            selector.onchange = function() {
+              database.ref('teams/' + teamCode + '/activeRouteId').set(this.value);
+            };
+          }
+
+          // Kick buttons
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
             btn.onclick = (e) => {
               e.stopPropagation();
@@ -1182,7 +1328,7 @@
       };
 
       // ============================================================
-      // 15. TRACKING CONTROLS
+      // 14. TRACKING CONTROLS
       // ============================================================
       function startTracking() {
         if (!myLastPosition) {
@@ -1239,7 +1385,7 @@
       }
 
       // ============================================================
-      // 16. TEST FIREBASE
+      // 15. TEST FIREBASE
       // ============================================================
       function testFirebaseConnection() {
         if (!teamCode) return;
@@ -1253,7 +1399,7 @@
       }
 
       // ============================================================
-      // 17. EVENT LISTENERS
+      // 16. EVENT LISTENERS
       // ============================================================
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
@@ -1289,6 +1435,18 @@
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
+      // Status change
+      $statusSelect.addEventListener('change', function() {
+        myStatus = this.value;
+        localStorage.setItem('biketeam_mystatus', myStatus);
+        broadcastMyPosition();
+        updateTeamList();
+        if (userMarker) {
+          userMarker.setPopupContent(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
+        }
+      });
+
+      // Username validation
       $myNameInput.addEventListener('change', function() {
         const newName = this.value.trim();
         if (newName && newName !== myName) {
@@ -1330,7 +1488,7 @@
       }, UPDATE_INTERVAL_MS);
 
       // ============================================================
-      // 18. INIT
+      // 17. INIT
       // ============================================================
       async function init() {
         let storedTeamCode = localStorage.getItem('biketeam_teamcode');
@@ -1377,6 +1535,6 @@
       init();
 
     })();
-</script>
+  </script>
 </body>
 </html>
