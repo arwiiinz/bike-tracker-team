@@ -560,7 +560,7 @@
 
         console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
         initMap();
-         initOrientation(); 
+        initOrientation(); 
         $myNameInput.value = myName;
         $statusSelect.value = myStatus;
 
@@ -1066,11 +1066,18 @@
       // ============================================================
 // 🧭 COMPASS / ORIENTATION (Rotate map based on phone facing)
 // ============================================================
+// ============================================================
+// 🧭 COMPASS / ORIENTATION (Rotate map based on phone facing)
+// ============================================================
 let isOrientationActive = false;
+let compassLastUpdate = 0;
 
 function updateMapBearing(bearingDeg) {
   if (map && !isNaN(bearingDeg)) {
     map.setBearing(bearingDeg);
+    compassLastUpdate = Date.now();
+    // Optional: Show a tiny debug indicator in the console
+    // console.log('🧭 Bearing:', bearingDeg.toFixed(1));
   }
 }
 
@@ -1079,6 +1086,10 @@ function handleDeviceOrientation(event) {
   if (alpha !== null && !isNaN(alpha)) {
     isOrientationActive = true;
     updateMapBearing(alpha);
+    
+    // 🔥 LOG TO CONSOLE (Remove this later if you want)
+    // This helps you verify the compass is working
+    console.log('🧭 Compass heading:', alpha.toFixed(1));
   }
 }
 
@@ -1087,13 +1098,16 @@ function initOrientation() {
   if (typeof DeviceOrientationEvent !== 'undefined') {
     // iOS 13+ requires explicit permission
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // 🔥 iOS: The user MUST tap a button, so we ask directly here
       DeviceOrientationEvent.requestPermission()
         .then(response => {
           if (response === 'granted') {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass enabled – map rotates with your phone!');
+            console.log('✅ iOS Compass permission granted.');
           } else {
             showToast('⚠️ Compass permission denied. Map will stay north-up.', true);
+            console.warn('⚠️ iOS Compass permission denied.');
           }
         })
         .catch(err => console.warn('Orientation permission error:', err));
@@ -1101,15 +1115,21 @@ function initOrientation() {
       // Android and older iOS
       window.addEventListener('deviceorientation', handleDeviceOrientation);
       showToast('🧭 Compass active – map rotates with your phone!');
+      console.log('✅ Compass listener attached (Android/legacy).');
     }
   } else {
-    console.warn('Device orientation not supported.');
-    // Fallback: Use GPS heading (direction of movement)
+    console.warn('❌ Device orientation not supported on this browser.');
     showToast('⚠️ Compass not available. Using GPS direction (if moving).');
   }
-}
 
-      // ============================================================
+  // Fallback: If we don't get any compass data after 5 seconds, notify the user
+  setTimeout(() => {
+    if (!isOrientationActive) {
+      console.warn('⏳ No compass data received after 5 seconds. Check sensor permissions.');
+      // Don't spam the user with a toast, just log it.
+    }
+  }, 5000);
+}      // ============================================================
       // 12. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
