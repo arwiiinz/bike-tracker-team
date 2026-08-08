@@ -237,29 +237,6 @@
       .modal-box { padding: 20px 16px; }
     }
 
-    .custom-marker {
-      display: flex; align-items: center; justify-content: center;
-      width: 42px; height: 42px; border-radius: 50%;
-      font-size: 1.6rem;
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
-      transition: transform 0.15s;
-      cursor: pointer;
-      background: var(--panel);
-      border: 2px solid transparent;
-    }
-    .custom-marker.you-marker {
-      animation: bounce-marker 0.6s ease infinite alternate;
-      font-size: 2rem;
-      width: 50px;
-      height: 50px;
-      border-color: var(--accent2);
-      box-shadow: 0 0 20px rgba(0,210,255,0.4);
-    }
-    @keyframes bounce-marker {
-      from { transform: translateY(0); }
-      to { transform: translateY(-5px); }
-    }
-
     .admin-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
     .admin-section .admin-title { color: var(--warning); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
     .admin-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; cursor: pointer; }
@@ -292,6 +269,7 @@
   </style>
 </head>
 <body>
+  <!-- Header -->
   <header class="header">
     <span style="font-size:1.4rem;">🚴</span>
     <span class="logo">Bike<span>Team</span></span>
@@ -303,6 +281,7 @@
   </header>
 
   <div class="main-container">
+    <!-- Sidebar -->
     <aside class="sidebar hidden" id="sidebar">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
         <h3 style="margin:0; font-size:1rem; color:var(--accent2);">👥 Team Panel</h3>
@@ -342,6 +321,7 @@
       </div>
     </aside>
 
+    <!-- Map -->
     <div class="map-container">
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
       <button class="map-btn north-btn" id="northBtn" title="Reset to North">🧭</button>
@@ -363,7 +343,7 @@
   <script>
     (function() {
       // ============================================================
-      // FIREBASE CONFIG
+      // 1. FIREBASE CONFIG
       // ============================================================
       const firebaseConfig = {
         apiKey: "AIzaSyDQI0kkCJPNq-RYtzKhCEYS5sjQRcc5X0E",
@@ -379,7 +359,7 @@
       const database = firebase.database();
 
       // ============================================================
-      // USER ID & STATE
+      // 2. USER ID
       // ============================================================
       let myUserId = localStorage.getItem('biketeam_userid');
       if (!myUserId) {
@@ -388,6 +368,9 @@
       }
       console.log(`🆔 User ID: ${myUserId}`);
 
+      // ============================================================
+      // 3. STATE
+      // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
@@ -415,10 +398,15 @@
       let mapInitialized = false;
       let followMode = true;
 
-      // MapLibre marker references
-      let myMarker = null;
-      let myTrailSourceId = null;
-      let myTrailLayerId = null;
+      // ============================================================
+      // 4. NEW: SYMBOL LAYER FOR MY MARKER (No HTML elements!)
+      // ============================================================
+      const MY_MARKER_SOURCE = 'my-marker-source';
+      const MY_MARKER_LAYER = 'my-marker-layer';
+      const MY_TRAIL_SOURCE = 'my-trail-source';
+      const MY_TRAIL_LAYER = 'my-trail-layer';
+
+      // Remote markers (still using HTML Markers for simplicity – they work fine)
       let remoteMarkers = {};
       let remoteTrails = {};
       let routeLayerId = null;
@@ -451,7 +439,7 @@
       const $miniTime = document.getElementById('miniTime');
 
       // ============================================================
-      // MODAL / TEAM CREATION & JOIN
+      // 5. MODAL / TEAM CREATION & JOIN (unchanged)
       // ============================================================
       function showModal() {
         return new Promise((resolve) => {
@@ -563,7 +551,7 @@
       }
 
       // ============================================================
-      // START APP
+      // 6. START APP
       // ============================================================
       let appStarted = false;
 
@@ -633,7 +621,7 @@
       }
 
       // ============================================================
-      // FIREBASE LISTENERS
+      // 7. FIREBASE LISTENERS (unchanged)
       // ============================================================
       let locationsRef = null;
       let myLocationRef = null;
@@ -810,7 +798,7 @@
       }
 
       // ============================================================
-      // LEADER ACTIONS
+      // 8. LEADER ACTIONS (unchanged)
       // ============================================================
       function kickUser(userId, userName) {
         if (!isLeader) return;
@@ -903,7 +891,7 @@
       }
 
       // ============================================================
-      // VALIDATE USERNAME
+      // 9. VALIDATE USERNAME (unchanged)
       // ============================================================
       function validateAndSetUsername(newName) {
         if (!newName || newName.trim() === '') {
@@ -944,7 +932,7 @@
       }
 
       // ============================================================
-      // MAP LIBRE INIT
+      // 10. 🗺️ MAP LIBRE INIT (with SYMBOL LAYER for marker)
       // ============================================================
       function initMap() {
         map = new maplibregl.Map({
@@ -960,6 +948,7 @@
           mapInitialized = true;
           console.log('🗺️ Map loaded');
           
+          // --- Controls ---
           map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
           const geolocateControl = new maplibregl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true },
@@ -969,6 +958,7 @@
           });
           map.addControl(geolocateControl, 'bottom-right');
 
+          // --- Map events ---
           map.on('dragstart', () => { followMode = false; });
           map.on('dblclick', () => {
             followMode = true;
@@ -983,6 +973,57 @@
             }
           });
 
+          // --- Create My Marker as a Symbol Layer ---
+          // 1. Create a GeoJSON source with an empty feature
+          map.addSource(MY_MARKER_SOURCE, {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: []
+            }
+          });
+
+          // 2. Create a symbol layer for the bike emoji
+          map.addLayer({
+            id: MY_MARKER_LAYER,
+            type: 'symbol',
+            source: MY_MARKER_SOURCE,
+            layout: {
+              'text-field': '🚴',
+              'text-size': 32,
+              'text-anchor': 'center',
+              'text-offset': [0, 0]
+            },
+            paint: {
+              'text-color': myColor,
+              'text-halo-color': '#1a1a2e',
+              'text-halo-width': 2
+            }
+          });
+
+          // --- Create My Trail ---
+          map.addSource(MY_TRAIL_SOURCE, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: []
+              }
+            }
+          });
+          map.addLayer({
+            id: MY_TRAIL_LAYER,
+            type: 'line',
+            source: MY_TRAIL_SOURCE,
+            paint: {
+              'line-color': myColor,
+              'line-width': 4,
+              'line-opacity': 0.7
+            }
+          });
+
+          // --- Initial marker update ---
           if (myLastPosition) {
             updateMyMarker();
             updateMyTrail();
@@ -1002,7 +1043,65 @@
       }
 
       // ============================================================
-      // MARKER HELPERS (FIXED & WITH DEBUG LOGS)
+      // 11. 🚴 UPDATE MY MARKER (Symbol Layer)
+      // ============================================================
+      function updateMyMarker() {
+        if (!myLastPosition || !map || !mapInitialized) return;
+        const { lat, lng } = myLastPosition;
+
+        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) {
+          console.warn('⚠️ Invalid coordinates, skipping marker update:', { lat, lng });
+          return;
+        }
+
+        console.log(`📍 Updating my marker to: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+
+        // Update the GeoJSON source with the new position
+        const source = map.getSource(MY_MARKER_SOURCE);
+        if (source) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: [{
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [lng, lat]
+              },
+              properties: {
+                name: myName,
+                speed: myCurrentSpeed,
+                status: myStatus
+              }
+            }]
+          });
+        }
+
+        // Also update the layer color if needed (status change)
+        if (map.getLayer(MY_MARKER_LAYER)) {
+          map.setPaintProperty(MY_MARKER_LAYER, 'text-color', myColor);
+        }
+      }
+
+      // ============================================================
+      // 12. 🚵 UPDATE MY TRAIL
+      // ============================================================
+      function updateMyTrail() {
+        if (myRoutePoints.length < 2 || !map || !mapInitialized) return;
+
+        const source = map.getSource(MY_TRAIL_SOURCE);
+        if (source) {
+          source.setData({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: myRoutePoints.map(p => [p[1], p[0]])
+            }
+          });
+        }
+      }
+
+      // ============================================================
+      // 13. 👥 REMOTE MARKERS (HTML markers – they work fine for remote users)
       // ============================================================
       function createMarkerElement(emoji, color, isYou = false) {
         const el = document.createElement('div');
@@ -1012,107 +1111,6 @@
         return el;
       }
 
-      function forceFixMarkers() {
-        console.log('🔧 Force fixing markers...');
-        if (myLastPosition) {
-          const { lat, lng } = myLastPosition;
-          console.log(`📍 Force fixing to: ${lat}, ${lng}`);
-          // Remove existing marker and recreate
-          if (myMarker) {
-            myMarker.remove();
-            myMarker = null;
-          }
-          const el = createMarkerElement('🚴', myColor, true);
-          el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
-          myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([lng, lat])
-            .addTo(map);
-          const popup = new maplibregl.Popup({ offset: [0, -15] })
-            .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
-          myMarker.setPopup(popup);
-          map.setCenter([lng, lat]);
-          showToast('✅ Marker position fixed!');
-        } else {
-          showToast('⚠️ No position available. Set manual location first.', true);
-        }
-      }
-
-      function updateMyMarker() {
-        if (!myLastPosition || !map || !mapInitialized) return;
-        const { lat, lng } = myLastPosition;
-
-        // ✅ Skip invalid coordinates
-        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) {
-          console.warn('⚠️ Invalid coordinates, skipping marker update:', { lat, lng });
-          return;
-        }
-
-        console.log(`📍 Updating my marker to: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-
-        if (myMarker) {
-          // Update existing marker
-          myMarker.setLngLat([lng, lat]);
-          // Update popup content
-          const popup = myMarker.getPopup();
-          if (popup) {
-            popup.setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
-          }
-        } else {
-          // Create new marker
-          const el = createMarkerElement('🚴', myColor, true);
-          el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
-          myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([lng, lat])
-            .addTo(map);
-          const popup = new maplibregl.Popup({ offset: [0, -15] })
-            .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
-          myMarker.setPopup(popup);
-        }
-      }
-
-      function updateMyTrail() {
-        if (myRoutePoints.length < 2 || !map || !mapInitialized) return;
-
-        if (myTrailSourceId) {
-          try {
-            if (map.getLayer(myTrailLayerId)) map.removeLayer(myTrailLayerId);
-            if (map.getSource(myTrailSourceId)) map.removeSource(myTrailSourceId);
-          } catch(e) {}
-          myTrailSourceId = null;
-          myTrailLayerId = null;
-        }
-
-        const geojson = {
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: myRoutePoints.map(p => [p[1], p[0]])
-          }
-        };
-
-        const sourceId = 'user-trail-' + myUserId;
-        const layerId = 'user-trail-layer-' + myUserId;
-        myTrailSourceId = sourceId;
-        myTrailLayerId = layerId;
-
-        try {
-          map.addSource(sourceId, { type: 'geojson', data: geojson });
-          map.addLayer({
-            id: layerId,
-            type: 'line',
-            source: sourceId,
-            paint: {
-              'line-color': myColor,
-              'line-width': 4,
-              'line-opacity': 0.7
-            }
-          });
-        } catch(e) {
-          console.warn('Could not add trail:', e);
-        }
-      }
-
-      // Remote markers
       function updateRemoteMarkers() {
         if (!map || !mapInitialized) return;
 
@@ -1194,7 +1192,24 @@
       }
 
       // ============================================================
-      // GEOLOCATION
+      // 14. 🔧 FORCE FIX MARKER
+      // ============================================================
+      function forceFixMarkers() {
+        if (!myLastPosition) {
+          showToast('⚠️ No position available. Set manual location first.', true);
+          return;
+        }
+        console.log('🔧 Force fixing marker to:', myLastPosition.lat, myLastPosition.lng);
+        updateMyMarker();
+        if (map) {
+          map.setCenter([myLastPosition.lng, myLastPosition.lat]);
+          map.setZoom(16);
+        }
+        showToast('✅ Marker position fixed!');
+      }
+
+      // ============================================================
+      // 15. GEOLOCATION
       // ============================================================
       function startGeolocation() {
         if (useManualLocation) return false;
@@ -1270,7 +1285,7 @@
       }
 
       // ============================================================
-      // COMPASS
+      // 16. COMPASS (unchanged)
       // ============================================================
       let isOrientationActive = false;
 
@@ -1328,7 +1343,7 @@
       }
 
       // ============================================================
-      // MANUAL LOCATION
+      // 17. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
         stopGeolocation();
@@ -1361,7 +1376,7 @@
       }
 
       // ============================================================
-      // HELPERS
+      // 18. HELPERS (unchanged)
       // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
@@ -1372,7 +1387,7 @@
       }
 
       // ============================================================
-      // UI UPDATES
+      // 19. UI UPDATES (unchanged)
       // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
@@ -1455,7 +1470,7 @@
       }
 
       // ============================================================
-      // ADMIN PANEL
+      // 20. ADMIN PANEL (unchanged)
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -1565,7 +1580,7 @@
       };
 
       // ============================================================
-      // TRACKING CONTROLS
+      // 21. TRACKING CONTROLS (unchanged)
       // ============================================================
       function startTracking() {
         if (!myLastPosition) {
@@ -1577,14 +1592,7 @@
         trackStartTime = Date.now();
         myTotalDistance = 0;
         myRoutePoints = [[myLastPosition.lat, myLastPosition.lng]];
-        if (myTrailSourceId && map) {
-          try {
-            if (map.getLayer(myTrailLayerId)) map.removeLayer(myTrailLayerId);
-            if (map.getSource(myTrailSourceId)) map.removeSource(myTrailSourceId);
-          } catch(e) {}
-          myTrailSourceId = null;
-          myTrailLayerId = null;
-        }
+        updateMyTrail();
         $btnStart.style.display = 'none';
         $btnStop.style.display = 'inline-flex';
         $statusText.textContent = 'LIVE';
@@ -1628,7 +1636,7 @@
       }
 
       // ============================================================
-      // RIDE SESSION PERSISTENCE
+      // 22. RIDE SESSION PERSISTENCE (unchanged)
       // ============================================================
       const SESSION_KEY = 'biketeam_ridesession';
 
@@ -1670,7 +1678,7 @@
       }
 
       // ============================================================
-      // TEST FIREBASE
+      // 23. TEST FIREBASE (unchanged)
       // ============================================================
       function testFirebaseConnection() {
         if (!teamCode) return;
@@ -1684,7 +1692,7 @@
       }
 
       // ============================================================
-      // EVENT LISTENERS
+      // 24. EVENT LISTENERS
       // ============================================================
 
       const $compassBtn = document.getElementById('btnEnableCompass');
@@ -1737,7 +1745,6 @@
         });
       }
 
-      // 🔧 Fix Marker Button
       const $fixMarkerBtn = document.getElementById('fixMarkerBtn');
       if ($fixMarkerBtn) {
         $fixMarkerBtn.addEventListener('click', forceFixMarkers);
@@ -1803,7 +1810,7 @@
       });
 
       // ============================================================
-      // INIT
+      // 25. INIT
       // ============================================================
       async function init() {
         let storedTeamCode = localStorage.getItem('biketeam_teamcode');
