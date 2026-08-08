@@ -62,7 +62,6 @@
       user-select: none;
     }
 
-    /* ===== HEADER ===== */
     .header {
       height: var(--header-h);
       background: var(--panel);
@@ -94,13 +93,8 @@
       animation: pulse-dot 1.8s infinite;
     }
     @keyframes pulse-dot {
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7);
-      }
-      50% {
-        box-shadow: 0 0 0 8px rgba(46, 204, 113, 0);
-      }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+      50% { box-shadow: 0 0 0 8px rgba(46, 204, 113, 0); }
     }
     .status-text {
       font-size: 0.65rem;
@@ -110,9 +104,7 @@
       letter-spacing: 0.5px;
       white-space: nowrap;
     }
-    .spacer {
-      flex: 1;
-    }
+    .spacer { flex: 1; }
 
     .btn {
       padding: 6px 14px;
@@ -131,25 +123,19 @@
       min-height: var(--touch-target);
       background: transparent;
     }
-    .btn:active {
-      transform: scale(0.95);
-    }
+    .btn:active { transform: scale(0.95); }
     .btn-outline {
       border: 1.5px solid var(--border);
       color: var(--text);
       background: transparent;
     }
-    .btn-outline:active {
-      border-color: var(--accent2);
-      color: var(--accent2);
-    }
+    .btn-outline:active { border-color: var(--accent2); color: var(--accent2); }
     .btn-sm {
       padding: 4px 10px;
       font-size: 0.65rem;
       min-height: 30px;
     }
 
-    /* ===== MAIN ===== */
     .main-container {
       display: flex;
       flex: 1;
@@ -157,7 +143,6 @@
       position: relative;
     }
 
-    /* ===== SIDEBAR ===== */
     .sidebar {
       width: var(--sidebar-w);
       background: var(--panel);
@@ -209,24 +194,15 @@
       padding-bottom: 12px;
       -webkit-overflow-scrolling: touch;
     }
-    .sidebar-content::-webkit-scrollbar {
-      width: 3px;
-    }
-    .sidebar-content::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    .sidebar-content::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 10px;
-    }
+    .sidebar-content::-webkit-scrollbar { width: 3px; }
+    .sidebar-content::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
     .sidebar-section {
       padding: 12px 16px;
       border-bottom: 1px solid var(--border);
     }
-    .sidebar-section:last-child {
-      border-bottom: none;
-    }
+    .sidebar-section:last-child { border-bottom: none; }
     .sidebar-section h3 {
       font-size: 0.6rem;
       text-transform: uppercase;
@@ -250,9 +226,7 @@
       border: 1px solid transparent;
       transition: border-color 0.3s;
     }
-    .stat-card:active {
-      border-color: var(--accent2);
-    }
+    .stat-card:active { border-color: var(--accent2); }
     .stat-value {
       font-size: 1.2rem;
       font-weight: 700;
@@ -284,16 +258,12 @@
       border: 1.5px solid transparent;
       min-height: 48px;
     }
-    .member-card:active {
-      background: rgba(26, 58, 110, 0.6);
-    }
+    .member-card:active { background: rgba(26, 58, 110, 0.6); }
     .member-card.you {
       border-color: var(--accent2);
       box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
     }
-    .member-card.offline {
-      opacity: 0.5;
-    }
+    .member-card.offline { opacity: 0.5; }
     .member-dot {
       width: 32px;
       height: 32px;
@@ -305,10 +275,7 @@
       font-size: 1.1rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
-    .member-info {
-      flex: 1;
-      min-width: 0;
-    }
+    .member-info { flex: 1; min-width: 0; }
     .member-name {
       font-weight: 700;
       font-size: 0.8rem;
@@ -329,14 +296,8 @@
       font-weight: 600;
       flex-shrink: 0;
     }
-    .status-active {
-      background: rgba(46, 204, 113, 0.2);
-      color: var(--success);
-    }
-    .status-inactive {
-      background: rgba(243, 156, 18, 0.2);
-      color: var(--warning);
-    }
+    .status-active { background: rgba(46, 204, 113, 0.2); color: var(--success); }
+    .status-inactive { background: rgba(243, 156, 18, 0.2); color: var(--warning); }
     .badge-you {
       background: var(--accent2);
       color: #000;
@@ -376,10 +337,7 @@
       font-size: 0.55rem;
       cursor: pointer;
     }
-    .admin-btn:hover {
-      background: var(--danger);
-      color: #fff;
-    }
+    .admin-btn:hover { background: var(--danger); color: #fff; }
 
     #statusSelect {
       background: var(--card);
@@ -392,9 +350,7 @@
       font-family: inherit;
       width: 100%;
     }
-    #statusSelect option {
-      background: var(--panel);
-    }
+    #statusSelect option { background: var(--panel); }
 
     .route-controls {
       margin-top: 6px;
@@ -436,10 +392,7 @@
       font-size: 0.5rem;
       cursor: pointer;
     }
-    .delete-route-btn:hover {
-      background: var(--danger);
-      color: #fff;
-    }
+    .delete-route-btn:hover { background: var(--danger); color: #fff; }
     .route-list-item {
       display: flex;
       justify-content: space-between;
@@ -447,9 +400,7 @@
       padding: 3px 0;
       border-bottom: 1px solid var(--border);
     }
-    .route-list-item span {
-      font-size: 0.7rem;
-    }
+    .route-list-item span { font-size: 0.7rem; }
 
     #myNameInput {
       flex: 2;
@@ -463,11 +414,8 @@
       outline: none;
       font-family: inherit;
     }
-    #myNameInput:focus {
-      border-color: var(--accent2);
-    }
+    #myNameInput:focus { border-color: var(--accent2); }
 
-    /* ===== MAP CONTAINER ===== */
     .map-container {
       flex: 1;
       position: relative;
@@ -488,14 +436,9 @@
       background: var(--panel) !important;
       color: var(--text) !important;
     }
-    .maplibregl-ctrl button:hover {
-      background: var(--card) !important;
-    }
-    .maplibregl-ctrl button svg {
-      fill: var(--text) !important;
-    }
+    .maplibregl-ctrl button:hover { background: var(--card) !important; }
+    .maplibregl-ctrl button svg { fill: var(--text) !important; }
 
-    /* ===== MAP OVERLAY BUTTONS ===== */
     .map-btn {
       position: absolute;
       z-index: 600;
@@ -519,26 +462,11 @@
       color: var(--accent2);
       transform: scale(0.92);
     }
-    .toggle-sidebar {
-      top: 12px;
-      left: 12px;
-    }
-    .follow-btn {
-      bottom: 110px;
-      right: 14px;
-    }
-    .locate-btn {
-      bottom: 52px;
-      right: 14px;
-    }
-    .north-btn {
-      bottom: 168px;
-      right: 14px;
-    }
+    .toggle-sidebar { top: 12px; left: 12px; }
+    .follow-btn { bottom: 110px; right: 14px; }
+    .locate-btn { bottom: 52px; right: 14px; }
+    .north-btn { bottom: 168px; right: 14px; }
 
-    /* ================================================================
-       🔥 TOP STATS OVERLAY – MORE VISIBLE
-       ================================================================ */
     #stats-overlay {
       position: absolute;
       top: 12px;
@@ -559,10 +487,7 @@
       pointer-events: none;
       transition: opacity 0.3s;
     }
-    #stats-overlay .stat-item {
-      text-align: center;
-      pointer-events: none;
-    }
+    #stats-overlay .stat-item { text-align: center; pointer-events: none; }
     #stats-overlay .stat-value {
       font-size: 1.4rem;
       font-weight: 800;
@@ -585,9 +510,6 @@
       background: var(--border);
     }
 
-    /* ================================================================
-       🔥 BOTTOM START/STOP OVERLAY – BIGGER, GLOWING
-       ================================================================ */
     #controls-overlay {
       position: absolute;
       bottom: 30px;
@@ -614,11 +536,8 @@
       transition: all 0.3s ease;
       position: relative;
     }
-    #controls-overlay .btn:active {
-      transform: scale(0.93);
-    }
+    #controls-overlay .btn:active { transform: scale(0.93); }
 
-    /* Start button – glowing green */
     #controls-overlay .btn-start {
       background: linear-gradient(135deg, #2ecc71, #27ae60);
       color: #fff;
@@ -629,7 +548,6 @@
       transform: scale(1.02);
     }
 
-    /* Stop button – glowing red */
     #controls-overlay .btn-stop {
       background: linear-gradient(135deg, #e74c3c, #c0392b);
       color: #fff;
@@ -640,23 +558,15 @@
       transform: scale(1.02);
     }
 
-    /* Pulsing ring animation when idle */
     @keyframes pulse-ring {
-      0% {
-        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4);
-      }
-      70% {
-        box-shadow: 0 0 0 20px rgba(46, 204, 113, 0);
-      }
-      100% {
-        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
-      }
+      0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }
+      70% { box-shadow: 0 0 0 20px rgba(46, 204, 113, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
     }
     #controls-overlay .btn-start.idle {
       animation: pulse-ring 2s ease-in-out infinite;
     }
 
-    /* ===== TOAST ===== */
     .toast {
       position: fixed;
       top: 60px;
@@ -679,27 +589,14 @@
       background: rgba(74, 26, 26, 0.9);
     }
     @keyframes slideIn {
-      from {
-        transform: translateX(120%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0);
-        opacity: 1;
-      }
+      from { transform: translateX(120%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
     }
     @keyframes slideOut {
-      from {
-        transform: translateX(0);
-        opacity: 1;
-      }
-      to {
-        transform: translateX(120%);
-        opacity: 0;
-      }
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(120%); opacity: 0; }
     }
 
-    /* ===== MODAL ===== */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -751,24 +648,12 @@
       background: var(--accent2);
       color: #000;
     }
-    .modal-box .btn-group .btn-start:hover {
-      background: #33ddff;
-    }
+    .modal-box .btn-group .btn-start:hover { background: #33ddff; }
 
-    /* ===== RESPONSIVE ===== */
     @media (max-width: 768px) {
-      :root {
-        --header-h: 44px;
-        --sidebar-w: 280px;
-      }
-      .header .logo {
-        font-size: 1rem;
-      }
-      .btn {
-        padding: 4px 10px;
-        font-size: 0.65rem;
-        min-height: 34px;
-      }
+      :root { --header-h: 44px; --sidebar-w: 280px; }
+      .header .logo { font-size: 1rem; }
+      .btn { padding: 4px 10px; font-size: 0.65rem; min-height: 34px; }
       .sidebar {
         position: absolute;
         top: 0;
@@ -776,12 +661,8 @@
         height: 100%;
         width: var(--sidebar-w);
       }
-      .sidebar:not(.hidden) {
-        transform: translateX(0);
-      }
-      .sidebar.hidden {
-        transform: translateX(-100%);
-      }
+      .sidebar:not(.hidden) { transform: translateX(0); }
+      .sidebar.hidden { transform: translateX(-100%); }
       .toggle-sidebar {
         top: 8px;
         left: 8px;
@@ -789,23 +670,10 @@
         height: 38px;
         font-size: 1rem;
       }
-      .map-btn {
-        width: 38px;
-        height: 38px;
-        font-size: 1rem;
-      }
-      .follow-btn {
-        bottom: 95px;
-        right: 10px;
-      }
-      .locate-btn {
-        bottom: 45px;
-        right: 10px;
-      }
-      .north-btn {
-        bottom: 145px;
-        right: 10px;
-      }
+      .map-btn { width: 38px; height: 38px; font-size: 1rem; }
+      .follow-btn { bottom: 95px; right: 10px; }
+      .locate-btn { bottom: 45px; right: 10px; }
+      .north-btn { bottom: 145px; right: 10px; }
       #stats-overlay {
         top: 8px;
         padding: 8px 16px;
@@ -813,73 +681,41 @@
         min-width: 160px;
         border-radius: 12px;
       }
-      #stats-overlay .stat-value {
-        font-size: 1.1rem;
-      }
-      #stats-overlay .stat-label {
-        font-size: 0.45rem;
-      }
-      #controls-overlay {
-        bottom: 20px;
-      }
+      #stats-overlay .stat-value { font-size: 1.1rem; }
+      #stats-overlay .stat-label { font-size: 0.45rem; }
+      #controls-overlay { bottom: 20px; }
       #controls-overlay .btn {
         font-size: 1rem;
         padding: 12px 28px;
         min-height: 50px;
         min-width: 110px;
       }
-      .modal-box {
-        padding: 20px 16px;
-      }
-      .modal-box h2 {
-        font-size: 1.2rem;
-      }
-      .sidebar-header h3 {
-        font-size: 0.8rem;
-      }
-      .stat-value {
-        font-size: 1rem;
-      }
-      .member-name {
-        font-size: 0.75rem;
-      }
+      .modal-box { padding: 20px 16px; }
+      .modal-box h2 { font-size: 1.2rem; }
+      .sidebar-header h3 { font-size: 0.8rem; }
+      .stat-value { font-size: 1rem; }
+      .member-name { font-size: 0.75rem; }
     }
 
     @media (max-width: 480px) {
-      :root {
-        --header-h: 40px;
-        --sidebar-w: 260px;
-      }
+      :root { --header-h: 40px; --sidebar-w: 260px; }
       #stats-overlay {
         gap: 10px;
         padding: 6px 12px;
         min-width: 130px;
         top: 6px;
       }
-      #stats-overlay .stat-value {
-        font-size: 0.9rem;
-      }
-      #stats-overlay .divider {
-        height: 18px;
-      }
+      #stats-overlay .stat-value { font-size: 0.9rem; }
+      #stats-overlay .divider { height: 18px; }
       #controls-overlay .btn {
         font-size: 0.85rem;
         padding: 10px 20px;
         min-height: 44px;
         min-width: 90px;
       }
-      .member-card {
-        padding: 6px 10px;
-        min-height: 40px;
-      }
-      .member-dot {
-        width: 28px;
-        height: 28px;
-        font-size: 0.9rem;
-      }
-      .member-name {
-        font-size: 0.7rem;
-      }
+      .member-card { padding: 6px 10px; min-height: 40px; }
+      .member-dot { width: 28px; height: 28px; font-size: 0.9rem; }
+      .member-name { font-size: 0.7rem; }
     }
 
     .custom-marker {
@@ -905,17 +741,12 @@
       box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
     }
     @keyframes bounce-marker {
-      from {
-        transform: translateY(0);
-      }
-      to {
-        transform: translateY(-5px);
-      }
+      from { transform: translateY(0); }
+      to { transform: translateY(-5px); }
     }
   </style>
 </head>
 <body>
-  <!-- ===== HEADER ===== -->
   <header class="header">
     <span style="font-size:1.2rem;">🚴</span>
     <span class="logo">Bike<span>Team</span></span>
@@ -925,17 +756,13 @@
     <button class="btn btn-outline btn-sm" id="btnEnableCompass" style="border-color: var(--accent2);">🧭 Compass</button>
   </header>
 
-  <!-- ===== MAIN ===== -->
   <div class="main-container">
-
-    <!-- ===== SIDEBAR ===== -->
     <aside class="sidebar hidden" id="sidebar">
       <div class="sidebar-header">
         <h3 id="sidebarTitle">👥 Team</h3>
         <button id="closeSidebarBtn">✕</button>
       </div>
       <div class="sidebar-content">
-        <!-- My Stats -->
         <div class="sidebar-section">
           <h3>📊 My Ride</h3>
           <div class="my-stats">
@@ -956,7 +783,6 @@
           </div>
         </div>
 
-        <!-- Team List -->
         <div class="sidebar-section" style="flex:1; border-bottom: none;">
           <h3>👥 Riders (<span id="teamCount">0</span>)</h3>
           <div class="team-list" id="teamList"></div>
@@ -965,18 +791,14 @@
       </div>
     </aside>
 
-    <!-- ===== MAP ===== -->
     <div class="map-container">
-      <!-- Map Buttons -->
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
       <button class="map-btn north-btn" id="northBtn" title="Reset to North">🧭</button>
       <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
       <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
 
-      <!-- Map -->
       <div id="map"></div>
 
-      <!-- ===== TOP STATS OVERLAY ===== -->
       <div id="stats-overlay">
         <div class="stat-item">
           <div class="stat-value" id="miniSpeed">0.0</div>
@@ -994,7 +816,6 @@
         </div>
       </div>
 
-      <!-- ===== BOTTOM START/STOP OVERLAY ===== -->
       <div id="controls-overlay">
         <button class="btn btn-start idle" id="btnStart">▶ Start</button>
         <button class="btn btn-stop" id="btnStop" style="display:none;">⏹ Stop</button>
@@ -1006,9 +827,7 @@
 
   <script>
     (function() {
-      // ============================================================
-      // FIREBASE CONFIG
-      // ============================================================
+      // ===== FIREBASE CONFIG =====
       const firebaseConfig = {
         apiKey: "AIzaSyDQI0kkCJPNq-RYtzKhCEYS5sjQRcc5X0E",
         databaseURL: "https://biketeamtracker-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -1022,19 +841,14 @@
       firebase.initializeApp(firebaseConfig);
       const database = firebase.database();
 
-      // ============================================================
-      // USER ID
-      // ============================================================
+      // ===== USER ID =====
       let myUserId = localStorage.getItem('biketeam_userid');
       if (!myUserId) {
         myUserId = 'user_' + Math.random().toString(36).substring(2, 10);
         localStorage.setItem('biketeam_userid', myUserId);
       }
-      console.log(`🆔 User ID: ${myUserId}`);
 
-      // ============================================================
-      // STATE
-      // ============================================================
+      // ===== STATE =====
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
@@ -1101,9 +915,7 @@
       const $miniDist = document.getElementById('miniDist');
       const $miniTime = document.getElementById('miniTime');
 
-      // ============================================================
-      // MODAL
-      // ============================================================
+      // ===== MODAL =====
       function showModal() {
         return new Promise((resolve) => {
           const overlay = document.createElement('div');
@@ -1225,16 +1037,12 @@
         startAppWithTeam();
       }
 
-      // ============================================================
-      // START APP
-      // ============================================================
+      // ===== START APP =====
       let appStarted = false;
 
       function startAppWithTeam() {
         if (appStarted) return;
         appStarted = true;
-
-        console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
 
         if (teamCode === 'openworld') {
           $sidebarTitle.textContent = '🌍 Open World';
@@ -1263,7 +1071,6 @@
           $statusText.style.color = 'var(--success)';
           showToast('🔄 Ride restored from idle state.');
         } else {
-          // Start button idle animation
           $btnStart.classList.add('idle');
         }
 
@@ -1287,7 +1094,6 @@
         setupFirebaseListeners();
         updateTeamList();
         setInterval(updateMyStats, 1000);
-        console.log(`✅ BikeTeam started. Team: ${teamCode}, Your ID: ${myUserId}`);
         showToast(`🔑 Team: ${teamCode}`);
 
         setTimeout(() => {
@@ -1299,15 +1105,12 @@
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
-              .then(() => console.log('✅ Service Worker registered'))
-              .catch((err) => console.error('❌ Service Worker error:', err));
+              .catch(() => {});
           });
         }
       }
 
-      // ============================================================
-      // FIREBASE LISTENERS
-      // ============================================================
+      // ===== FIREBASE LISTENERS =====
       let locationsRef = null;
       let myLocationRef = null;
 
@@ -1379,7 +1182,7 @@
 
         if (teamCode !== 'openworld') {
           const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
-          savedRoutesRef.on('value', (snapshot) => {
+          savedRoutesRef.on('value', () => {
             renderRouteDropdown();
             renderRouteList();
           });
@@ -1464,14 +1267,11 @@
           status: myStatus
         };
         myLocationRef.set(data).catch((error) => {
-          console.error('❌ Firebase write error:', error);
           showToast('❌ Firebase Error: ' + error.message, true);
         });
       }
 
-      // ============================================================
-      // LEADER ACTIONS
-      // ============================================================
+      // ===== LEADER ACTIONS =====
       function kickUser(userId, userName) {
         if (!isLeader || teamCode === 'openworld') return;
         if (userId === myUserId) return;
@@ -1548,7 +1348,7 @@
             }).then(() => {
               showToast('✅ Route uploaded and activated!');
               database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
-                .catch(err => showToast('⚠️ Route saved but failed to activate: ' + err.message, true));
+                .catch(() => showToast('⚠️ Route saved but failed to activate.', true));
             }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
           });
         };
@@ -1573,9 +1373,7 @@
         });
       }
 
-      // ============================================================
-      // VALIDATE USERNAME
-      // ============================================================
+      // ===== VALIDATE USERNAME =====
       function validateAndSetUsername(newName) {
         if (!newName || newName.trim() === '') {
           showToast('⚠️ Name cannot be empty.', true);
@@ -1608,15 +1406,13 @@
               showToast(`✅ Username set to "${myName}"`);
               return true;
             }
-          }).catch((e) => {
-            console.error('Validation error:', e);
+          }).catch(() => {
+            showToast('❌ Error validating username.', true);
             return false;
           });
       }
 
-      // ============================================================
-      // MAP
-      // ============================================================
+      // ===== MAP =====
       function initMap() {
         map = new maplibregl.Map({
           container: 'map',
@@ -1629,7 +1425,6 @@
 
         map.on('load', function() {
           mapInitialized = true;
-          console.log('🗺️ Map loaded');
 
           map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
 
@@ -1702,23 +1497,17 @@
         });
 
         map.on('error', function() {
-          console.warn('Map style error, using fallback');
           if (!map.getStyle()) {
             map.setStyle('https://demotiles.maplibre.org/style.json');
           }
         });
       }
 
-      // ============================================================
-      // MARKERS
-      // ============================================================
+      // ===== MARKERS =====
       function updateMyMarker() {
         if (!myLastPosition || !map || !mapInitialized) return;
         const { lat, lng } = myLastPosition;
-        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) {
-          console.warn('⚠️ Invalid coordinates, skipping marker update:', { lat, lng });
-          return;
-        }
+        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) return;
         const source = map.getSource(MY_MARKER_SOURCE);
         if (source) {
           source.setData({
@@ -1833,9 +1622,7 @@
         }
       }
 
-      // ============================================================
-      // GEOLOCATION
-      // ============================================================
+      // ===== GEOLOCATION =====
       function startGeolocation() {
         if (useManualLocation) return false;
         if (!navigator.geolocation) {
@@ -1909,9 +1696,7 @@
         }
       }
 
-      // ============================================================
-      // COMPASS
-      // ============================================================
+      // ===== COMPASS =====
       let isOrientationActive = false;
 
       function updateMapBearing(bearingDeg) {
@@ -1925,22 +1710,18 @@
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
           updateMapBearing(360 - alpha);
-          console.log('🧭 Compass heading:', alpha.toFixed(1));
         }
       }
 
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
           if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            console.log('🍎 iOS: Tap "Compass" button to activate.');
             showToast('🍎 Tap "Compass" button for map rotation.', false);
           } else {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass active – map rotates with your phone!');
-            console.log('✅ Compass listener attached.');
           }
         } else {
-          console.warn('❌ Device orientation not supported.');
           showToast('⚠️ Compass not available.', true);
         }
       }
@@ -1954,21 +1735,17 @@
                 window.addEventListener('deviceorientation', handleDeviceOrientation);
                 showToast('✅ Compass activated! Rotate your phone.');
                 $compassBtn.style.display = 'none';
-                console.log('✅ iOS Compass permission granted.');
               } else {
                 showToast('❌ Compass blocked. Please allow in browser settings.', true);
-                console.warn('⚠️ iOS Compass permission denied.');
               }
             })
-            .catch(err => console.warn('Orientation permission error:', err));
+            .catch(() => {});
         } else {
           showToast('ℹ️ Compass already active or not supported.');
         }
       }
 
-      // ============================================================
-      // HELPERS
-      // ============================================================
+      // ===== HELPERS =====
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -2062,9 +1839,7 @@
         updateAdminPanel();
       }
 
-      // ============================================================
-      // ROUTES
-      // ============================================================
+      // ===== ROUTES =====
       let activeRouteId = null;
 
       function renderRouteDropdown() {
@@ -2128,15 +1903,13 @@
                 if (activeRouteId === id) {
                   database.ref('teams/' + teamCode + '/activeRouteId').set(null);
                 }
-              }).catch(err => showToast('❌ Delete failed: ' + err.message, true));
+              }).catch(() => showToast('❌ Delete failed.', true));
             };
           });
         });
       }
 
-      // ============================================================
-      // ADMIN PANEL
-      // ============================================================
+      // ===== ADMIN PANEL =====
       function updateAdminPanel() {
         if (!teamCode) {
           $adminPanel.style.display = 'none';
@@ -2259,9 +2032,7 @@
         }
       };
 
-      // ============================================================
-      // TRACKING CONTROLS
-      // ============================================================
+      // ===== TRACKING CONTROLS =====
       function startTracking() {
         if (!myLastPosition) {
           showToast('⚠️ No location yet. Wait for GPS or set manual location.');
@@ -2319,9 +2090,7 @@
         return d.innerHTML;
       }
 
-      // ============================================================
-      // SESSION
-      // ============================================================
+      // ===== SESSION =====
       const SESSION_KEY = 'biketeam_ridesession';
 
       function saveRideSession() {
@@ -2354,24 +2123,18 @@
 
       function clearRideSession() { localStorage.removeItem(SESSION_KEY); }
 
-      // ============================================================
-      // TEST FIREBASE
-      // ============================================================
+      // ===== TEST FIREBASE (silent) =====
       function testFirebaseConnection() {
         if (!teamCode) return;
         const testRef = database.ref('teams/' + teamCode + '/_test');
         testRef.set({ test: 'ping', time: Date.now(), device: myUserId })
-          .then(() => { showToast('✅ Firebase Connection: SUCCESS!'); testRef.remove(); })
+          .then(() => { testRef.remove(); })
           .catch((error) => {
             showToast('❌ Firebase ERROR: ' + error.message, true);
-            alert('🔥 FIREBASE BLOCKED!\n\n' + error.message + '\n\nSOLUTION:\n1. Go to Firebase Console -> Realtime Database -> Rules\n2. Set rules to:\n{ "rules": { ".read": true, ".write": true } }\n3. Click Publish.');
           });
       }
 
-      // ============================================================
-      // EVENT LISTENERS
-      // ============================================================
-
+      // ===== EVENT LISTENERS =====
       $compassBtn.addEventListener('click', enableCompass);
 
       $toggleSidebar.addEventListener('click', () => {
@@ -2469,9 +2232,7 @@
 
       window.addEventListener('beforeunload', function() { saveRideSession(); });
 
-      // ============================================================
-      // INIT
-      // ============================================================
+      // ===== INIT =====
       async function init() {
         let storedTeamCode = localStorage.getItem('biketeam_teamcode');
 
