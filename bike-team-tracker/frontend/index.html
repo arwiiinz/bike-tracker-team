@@ -568,6 +568,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
+    <!-- Compass button removed from header -->
   </header>
 
   <div class="main-container">
@@ -695,7 +696,7 @@
       let mapInitialized = false;
       let followMode = true;
 
-      // ===== CLUSTERING MARKERS =====
+      // Clustering markers
       let clusterMarkers = [];
 
       // Trail layers
@@ -1598,7 +1599,7 @@
         }
       }
 
-      // ===== COMPASS =====
+      // ===== COMPASS (orientation only when tracking) =====
       let isOrientationActive = false;
       let lastCompassBearing = 0;
 
@@ -1613,6 +1614,7 @@
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
           lastCompassBearing = 360 - alpha;
+          // Only rotate if tracking is active
           if (isTracking) {
             updateMapBearing(lastCompassBearing);
           }
@@ -1918,7 +1920,6 @@
           followMode = true;
           return;
         }
-        // Find remote user
         const user = remoteUsers[uid];
         if (user && user.lat) {
           if (map) map.setCenter([user.lng, user.lat]);
@@ -1975,6 +1976,7 @@
         updateTeamList();
         broadcastMyPosition();
 
+        // 🔒 Lock map to North when stopped
         if (map) {
           map.setBearing(0);
         }
