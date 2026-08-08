@@ -1018,6 +1018,9 @@
 
         setupFirebaseListeners();
         updateTeamList();
+        // ✅ Build admin panel once at startup
+        updateAdminPanel();
+
         setInterval(updateMyStats, 1000);
         showToast(`🔑 Team: ${teamCode}`);
 
@@ -1057,7 +1060,7 @@
               isLeader = false;
               localStorage.removeItem('biketeam_isLeader');
             }
-            updateAdminPanel();
+            updateAdminPanel();   // ✅ rebuild only when leader changes
             return;
           }
           remoteUsers[snapshot.key] = snapshot.val();
@@ -1078,7 +1081,7 @@
               isLeader = false;
               localStorage.removeItem('biketeam_isLeader');
             }
-            updateAdminPanel();
+            updateAdminPanel();   // ✅ rebuild only when leader changes
             return;
           }
           if (remoteUsers[snapshot.key]) {
@@ -1949,6 +1952,9 @@
         return d;
       }
 
+      // ============================================================
+      // 🔥 FIXED: updateTeamList() no longer calls updateAdminPanel()
+      // ============================================================
       function updateTeamList() {
         const members = [];
         if (myLastPosition) {
@@ -2003,7 +2009,7 @@
             `;
           }).join('');
         }
-        updateAdminPanel();
+        // ❌ removed updateAdminPanel() to avoid rebuilding the admin panel on every position update
       }
 
       // ===== ROUTE UI =====
@@ -2077,7 +2083,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: ADMIN PANEL with robust upload button binding
+      // 🔥 FIXED: ADMIN PANEL – built once and only rebuilt on _meta change
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -2164,7 +2170,6 @@
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
-            // Remove any stale listeners by cloning
             const newBtn = uploadBtn.cloneNode(true);
             uploadBtn.parentNode.replaceChild(newBtn, uploadBtn);
             newBtn.addEventListener('click', function(e) {
@@ -2181,7 +2186,6 @@
           // 2. Route selector
           const selector = document.getElementById('routeSelector');
           if (selector) {
-            // Remove old listener by cloning
             const newSelector = selector.cloneNode(true);
             selector.parentNode.replaceChild(newSelector, selector);
             newSelector.addEventListener('change', function() {
@@ -2221,6 +2225,7 @@
             newDelete.addEventListener('click', deleteTeam);
           }
 
+          // Refresh dropdown and list after building
           renderRouteDropdown();
           renderRouteList();
 
