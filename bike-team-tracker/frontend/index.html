@@ -290,6 +290,9 @@
     .route-list-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--border); }
     .route-list-item span { font-size: 0.7rem; }
 
+    .start-controls { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }
+    .start-controls label { font-size: 0.6rem; color: var(--text-secondary); display: block; margin-bottom: 3px; }
+
     #myNameInput {
       flex: 2;
       min-width: 100px;
@@ -547,6 +550,19 @@
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.08); }
     }
+    .start-flag-marker {
+      width: 36px;
+      height: 36px;
+      font-size: 1.8rem;
+      background: transparent !important;
+      border: none !important;
+      filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
+      animation: pulse-flag 1s ease-in-out infinite alternate;
+    }
+    @keyframes pulse-flag {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.15); }
+    }
   </style>
 </head>
 <body>
@@ -690,10 +706,11 @@
 
       let remoteTrails = {};
 
-      // ---- ROUTE STATE ----
+      // ---- ROUTE & START POINT STATE ----
       let routeSourceId = null;
       let routeLayerId = null;
       let activeRouteId = null;
+      let startMarker = null; // maplibregl.Marker for the start flag
 
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
@@ -756,14 +773,14 @@
         });
       }
 
-      // ===== 🔥 FIXED: CREATE TEAM WITH NAME VALIDATION =====
+      // ===== TEAM CREATION WITH NAME VALIDATION =====
       async function createTeam() {
         const teamName = prompt('👑 Enter a name for your new team (e.g., "Sunday Riders"):', 'My Team');
         if (!teamName) return false;
         const trimmed = teamName.trim();
         if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
 
-        // 🔥 CHECK IF TEAM NAME ALREADY EXISTS
+        // Check if name already exists
         try {
           const nameSnap = await database.ref('teams')
             .orderByChild('_meta/teamName')
@@ -1041,33 +1058,28 @@
             renderRouteList();
           });
 
-          // 🔥 FIXED: Active route listener – replaces the route (not adds)
+          // Active route listener (replaces, not adds)
           const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
           activeRouteRef.on('value', (snapshot) => {
             const newActiveId = snapshot.val();
-
-            // 1. Remove the OLD route completely
+            // Remove old route
             if (routeLayerId && map) {
               try {
                 if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
                 if (map.getSource(routeSourceId)) map.removeSource(routeSourceId);
-              } catch (e) {
-                // ignore
-              }
+              } catch (e) {}
               routeLayerId = null;
               routeSourceId = null;
             }
-
-            // 2. If newActiveId is null, just update the dropdown and clear the route
             activeRouteId = newActiveId;
             renderRouteDropdown();
 
             if (!newActiveId) {
               showToast('🗺️ Route cleared.');
+              // Also clear start point if route cleared? We'll keep start as separate.
               return;
             }
 
-            // 3. Draw the NEW route
             database.ref('teams/' + teamCode + '/savedRoutes/' + newActiveId).once('value').then((snap) => {
               const route = snap.val();
               if (route && route.points && route.points.length > 1 && map) {
@@ -1102,6 +1114,31 @@
                 }
               }
             });
+          });
+
+          // ---- START POINT LISTENER ----
+          const startRef = database.ref('teams/' + teamCode + '/startPoint');
+          startRef.on('value', (snapshot) => {
+            const startData = snapshot.val();
+            // Remove old start marker
+            if (startMarker) {
+              startMarker.remove();
+              startMarker = null;
+            }
+            if (startData && startData.lat && startData.lng && map) {
+              // Create a marker with a flag emoji
+              const el = document.createElement('div');
+              el.className = 'start-flag-marker';
+              el.textContent = '🚩';
+              startMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+                .setLngLat([startData.lng, startData.lat])
+                .addTo(map);
+              // Popup
+              const popup = new maplibregl.Popup({ offset: [0, -10] })
+                .setHTML('<b>🏁 Start Point</b><br>Start your loop here.');
+              startMarker.setPopup(popup);
+              showToast('📍 Start point set!');
+            }
           });
         }
 
@@ -1441,6 +1478,43 @@
         };
 
         reader.readAsText(file);
+      }
+
+      // ===== START POINT CONTROLS (Leader only) =====
+      function setStartPoint() {
+        if (!isLeader) return;
+        if (!activeRouteId) {
+          showToast('Please select a route first.', true);
+          return;
+        }
+        // Fetch the active route's first point
+        database.ref('teams/' + teamCode + '/savedRoutes/' + activeRouteId).once('value').then((snap) => {
+          const route = snap.val();
+          if (!route || !route.points || route.points.length === 0) {
+            showToast('Route has no points.', true);
+            return;
+          }
+          const firstPoint = route.points[0];
+          const startData = { lat: firstPoint[0], lng: firstPoint[1] };
+          database.ref('teams/' + teamCode + '/startPoint').set(startData)
+            .then(() => {
+              showToast('🏁 Start point set at the beginning of the route.');
+            })
+            .catch((err) => {
+              showToast('❌ Failed to set start point: ' + err.message, true);
+            });
+        });
+      }
+
+      function clearStartPoint() {
+        if (!isLeader) return;
+        database.ref('teams/' + teamCode + '/startPoint').remove()
+          .then(() => {
+            showToast('🗑️ Start point cleared.');
+          })
+          .catch((err) => {
+            showToast('❌ Failed to clear start point: ' + err.message, true);
+          });
       }
 
       function leaveTeam() {
@@ -1847,7 +1921,6 @@
               const routeRef = database.ref('teams/' + teamCode + '/savedRoutes/' + id);
               routeRef.remove().then(() => {
                 showToast(`🗑️ Route "${name}" deleted.`);
-                // If the active route was deleted, clear it
                 if (activeRouteId === id) {
                   database.ref('teams/' + teamCode + '/activeRouteId').set(null);
                 }
@@ -1896,6 +1969,7 @@
             <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
+          // Route upload & select
           html += `<div class="route-controls">
             <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
@@ -1910,6 +1984,16 @@
             <div id="routeListItems"></div>
           </div>`;
 
+          // ---- START POINT CONTROLS ----
+          html += `<div class="start-controls">
+            <label>🏁 Start Point</label>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button id="setStartBtn" class="btn btn-outline btn-sm" style="flex:1;">Set Start</button>
+              <button id="clearStartBtn" class="btn btn-danger btn-sm" style="flex:1; border-color:var(--danger);color:var(--danger);">Clear Start</button>
+            </div>
+          </div>`;
+
+          // Member kick list
           const members = [];
           for (const uid in remoteUsers) {
             const u = remoteUsers[uid];
@@ -1930,7 +2014,7 @@
           $adminPanel.innerHTML = html;
 
           // ---- Attach events ----
-          // Upload button
+          // Upload
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
@@ -1952,6 +2036,16 @@
             selector.onchange = function() {
               database.ref('teams/' + teamCode + '/activeRouteId').set(this.value || null);
             };
+          }
+
+          // Start point buttons
+          const setStartBtn = document.getElementById('setStartBtn');
+          if (setStartBtn) {
+            setStartBtn.onclick = setStartPoint;
+          }
+          const clearStartBtn = document.getElementById('clearStartBtn');
+          if (clearStartBtn) {
+            clearStartBtn.onclick = clearStartPoint;
           }
 
           // Kick buttons
