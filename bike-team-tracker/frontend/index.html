@@ -381,7 +381,7 @@
 
     #controls-overlay {
       position: absolute;
-      bottom: 20%; /* ✅ Start button at 20% from bottom */
+      bottom: 30%;
       left: 50%;
       transform: translateX(-50%);
       z-index: 500;
@@ -499,7 +499,7 @@
       #stats-overlay { top: 8px; padding: 8px 16px; gap: 14px; min-width: 160px; border-radius: 12px; }
       #stats-overlay .stat-value { font-size: 1.1rem; }
       #stats-overlay .stat-label { font-size: 0.45rem; }
-      #controls-overlay { bottom: 20%; }
+      #controls-overlay { bottom: 30%; }
       #controls-overlay .btn { font-size: 1rem; padding: 12px 28px; min-height: 50px; min-width: 110px; }
       .modal-box { padding: 20px 16px; }
       .modal-box h2 { font-size: 1.2rem; }
@@ -513,7 +513,7 @@
       #stats-overlay { gap: 10px; padding: 6px 12px; min-width: 130px; top: 6px; }
       #stats-overlay .stat-value { font-size: 0.9rem; }
       #stats-overlay .divider { height: 18px; }
-      #controls-overlay { bottom: 20%; }
+      #controls-overlay { bottom: 25%; }
       #controls-overlay .btn { font-size: 0.85rem; padding: 10px 20px; min-height: 44px; min-width: 90px; }
       .member-card { padding: 6px 10px; min-height: 40px; }
       .member-dot { width: 28px; height: 28px; font-size: 0.9rem; }
@@ -568,7 +568,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <!-- Compass button removed -->
+    <!-- Compass button removed from header -->
   </header>
 
   <div class="main-container">
@@ -668,8 +668,7 @@
       const TRAIL_UPDATE_INTERVAL_MS = 10000;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
-      // 🔥 Cluster distance set to 50 meters (0.05 km)
-      const CLUSTER_DISTANCE_KM = 0.05;
+      const CLUSTER_DISTANCE_KM = 0.01; // 10 meters
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
         '#4ecdc4', '#ffe66d', '#a29bfe'
       ];
@@ -1210,39 +1209,32 @@
         return clusters;
       }
 
-      // ===== RENDER CLUSTERS (WITH SAFETY CHECKS) =====
+      // ===== RENDER CLUSTERS =====
       function renderClusters() {
         if (!map || !mapInitialized) return;
 
         // Collect all riders
         const riders = [];
 
-        // Add self only if we have a valid position (not 0,0 without timestamp)
+        // Add self
         if (myLastPosition) {
-          const { lat, lng, timestamp } = myLastPosition;
-          // Skip if coordinates are NaN or (0,0) with no timestamp (uninitialized)
-          if (!isNaN(lat) && !isNaN(lng) && !(lat === 0 && lng === 0 && !timestamp)) {
-            riders.push({
-              id: myUserId,
-              lat: lat,
-              lng: lng,
-              name: myName,
-              color: myColor,
-              status: myStatus,
-              isYou: true,
-              isActive: true,
-              speed: myCurrentSpeed
-            });
-          }
+          riders.push({
+            id: myUserId,
+            lat: myLastPosition.lat,
+            lng: myLastPosition.lng,
+            name: myName,
+            color: myColor,
+            status: myStatus,
+            isYou: true,
+            isActive: true,
+            speed: myCurrentSpeed
+          });
         }
 
-        // Add remote users with valid coordinates
+        // Add remote users
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
-          if (isNaN(u.lat) || isNaN(u.lng)) continue;
-          // Skip if coords are (0,0) and no timestamp (shouldn't happen for remote)
-          if (u.lat === 0 && u.lng === 0 && !u.timestamp) continue;
           const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
           riders.push({
             id: uid,
@@ -1255,13 +1247,6 @@
             isActive: !isOffline && u.isTracking,
             speed: u.speed || 0
           });
-        }
-
-        // If no riders, clear markers and return
-        if (riders.length === 0) {
-          for (const m of clusterMarkers) m.remove();
-          clusterMarkers = [];
-          return;
         }
 
         // Compute clusters
@@ -1639,7 +1624,7 @@
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
           if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            // Silent for iOS
+            showToast('🍎 Tap "North" button to enable compass rotation.', false);
           } else {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass active – map rotates with your phone!');
@@ -1929,6 +1914,7 @@
       }
 
       window.highlightUser = function(uid) {
+        // Find the cluster containing this user and center on it
         if (uid === myUserId && myLastPosition) {
           if (map) map.setCenter([myLastPosition.lng, myLastPosition.lat]);
           followMode = true;
