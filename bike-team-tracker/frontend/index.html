@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🚴 BikeTeam Tracker – Live Cycling Monitor</title>
   
-  <!-- PWA / iOS / Windows Meta Tags -->
+  <!-- PWA Meta -->
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,7 +15,7 @@
   <meta name="msapplication-TileColor" content="#1a1a2e">
   <meta name="msapplication-TileImage" content="/icon-144.png">
 
-  <!-- MapLibre GL JS (Modern, native rotation & compass) -->
+  <!-- MapLibre GL JS (native rotation, compass, geolocate) -->
   <link href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
 
@@ -24,7 +24,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* ===== YOUR EXISTING STYLES (mostly unchanged) ===== */
+    /* ===== YOUR EXISTING STYLES ===== */
     :root {
       --bg: #1a1a2e;
       --panel: #16213e;
@@ -151,7 +151,7 @@
     .map-container { flex:1; position: relative; z-index: 100; }
     #map { width:100%; height:100%; background:#1a2a3a; }
 
-    /* MapLibre controls override for dark theme */
+    /* MapLibre controls dark theme */
     .maplibregl-ctrl-group { background: var(--panel) !important; border: 1px solid var(--border) !important; }
     .maplibregl-ctrl button { background: var(--panel) !important; color: var(--text) !important; }
     .maplibregl-ctrl button:hover { background: var(--card) !important; }
@@ -241,7 +241,7 @@
       .modal-box { padding: 20px 16px; }
     }
 
-    /* Custom marker styling for MapLibre */
+    /* Custom markers */
     .custom-marker {
       display: flex; align-items: center; justify-content: center;
       width: 42px; height: 42px; border-radius: 50%;
@@ -265,7 +265,6 @@
     .admin-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; cursor: pointer; }
     .admin-btn:hover { background: var(--danger); color: #fff; }
     
-    /* Status dropdown styling */
     #statusSelect {
       background: var(--card);
       border: 1px solid var(--border);
@@ -279,7 +278,6 @@
     }
     #statusSelect option { background: var(--panel); }
     
-    /* Route controls */
     .route-controls { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
     .route-controls label { font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 4px; }
     #gpxFileInput {
@@ -364,7 +362,7 @@
   <script>
     (function() {
       // ============================================================
-      // 1. 🔥 FIREBASE CONFIG
+      // 1. 🔥 FIREBASE CONFIG (Replace with YOUR config if different)
       // ============================================================
       const firebaseConfig = {
         apiKey: "AIzaSyDQI0kkCJPNq-RYtzKhCEYS5sjQRcc5X0E",
@@ -387,7 +385,7 @@
         myUserId = 'user_' + Math.random().toString(36).substring(2,10);
         localStorage.setItem('biketeam_userid', myUserId);
       }
-      console.log(`🆔 Persistent User ID: ${myUserId}`);
+      console.log(`🆔 User ID: ${myUserId}`);
 
       // ============================================================
       // 3. STATE
@@ -415,16 +413,16 @@
 
       const remoteUsers = {};
 
-      let map;
-      let followMode = true;
+      let map = null;
       let mapInitialized = false;
-      
-      // MapLibre uses sources and layers instead of layer groups
-      // We'll manage features with arrays and update them
-      let userMarkerId = null;
-      let userTrailId = null;
-      let remoteMarkers = {};
-      let remoteTrails = {};
+      let followMode = true;
+
+      // MapLibre marker references
+      let myMarker = null;          // user's own marker
+      let myTrailSourceId = null;   // user's trail source
+      let myTrailLayerId = null;    // user's trail layer
+      let remoteMarkers = {};       // remote marker objects by user id
+      let remoteTrails = {};        // remote trail source ids by user id
       let routeLayerId = null;
 
       // DOM refs
@@ -455,7 +453,7 @@
       const $miniTime = document.getElementById('miniTime');
 
       // ============================================================
-      // 4. MODAL (Team creation / join) - UNCHANGED
+      // 4. MODAL (Team creation / join) – unchanged
       // ============================================================
       function showModal() {
         return new Promise((resolve) => {
@@ -569,7 +567,7 @@
       }
 
       // ============================================================
-      // 5. START APP AFTER TEAM IS SET
+      // 5. START APP
       // ============================================================
       let appStarted = false;
 
@@ -583,9 +581,7 @@
         $myNameInput.value = myName;
         $statusSelect.value = myStatus;
 
-        // ------------------------------------------------
-        // 🔥 RESTORE RIDE SESSION (Fixes idle reset issue)
-        // ------------------------------------------------
+        // Restore ride session
         const session = restoreRideSession();
         if (session && session.isTracking && session.lastPos) {
           isTracking = true;
@@ -593,20 +589,15 @@
           myTotalDistance = session.myTotalDistance || 0;
           myRoutePoints = session.myRoutePoints || [];
           myLastPosition = session.lastPos;
-          
           updateMyStats();
           updateMyMarker();
           updateMyTrail();
-          
           $btnStart.style.display = 'none';
           $btnStop.style.display = 'inline-flex';
           $statusText.textContent = 'LIVE';
           $statusText.style.color = 'var(--success)';
-          
           showToast('🔄 Ride restored from idle state.');
-          console.log('✅ Ride session restored:', session);
         }
-        // ------------------------------------------------
 
         if (window.innerWidth <= 768) {
           $sidebar.classList.add('hidden');
@@ -617,8 +608,8 @@
 
         const geoStarted = startGeolocation();
         if (!geoStarted && !useManualLocation) {
-          if (!myLastPosition) {
-            if (map) map.setCenter([40.7128, -74.006]);
+          if (!myLastPosition && map) {
+            map.setCenter([0, 0]);
             $statusText.textContent = 'NO GPS';
             $statusDot.style.background = 'var(--warning)';
             $statusDot.style.animation = 'none';
@@ -647,7 +638,7 @@
       }
 
       // ============================================================
-      // 6. FIREBASE LISTENERS - UNCHANGED
+      // 6. FIREBASE LISTENERS (unchanged)
       // ============================================================
       let locationsRef = null;
       let myLocationRef = null;
@@ -718,7 +709,7 @@
           updateTeamList();
         });
 
-        // --- ROUTE LISTENERS ---
+        // Routes
         const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
         savedRoutesRef.on('value', (snapshot) => {
           const routes = snapshot.val();
@@ -745,47 +736,45 @@
         activeRouteRef.on('value', (snapshot) => {
           const activeId = snapshot.val();
           // Remove old route
-          if (routeLayerId) {
-            if (map && map.getSource(routeLayerId)) {
-              map.removeLayer(routeLayerId);
-              map.removeSource(routeLayerId);
-            }
+          if (routeLayerId && map) {
+            try {
+              if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
+              if (map.getSource(routeLayerId)) map.removeSource(routeLayerId);
+            } catch(e) {}
             routeLayerId = null;
           }
-
           if (activeId) {
             database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
               const route = snap.val();
-              if (route && route.points && route.points.length > 1) {
+              if (route && route.points && route.points.length > 1 && map) {
                 const geojson = {
                   type: 'Feature',
                   geometry: {
                     type: 'LineString',
-                    coordinates: route.points.map(p => [p[1], p[0]]) // [lng, lat]
+                    coordinates: route.points.map(p => [p[1], p[0]])
                   }
                 };
                 const sourceId = 'route-' + activeId;
                 routeLayerId = sourceId;
-                if (map) {
-                  map.addSource(sourceId, { type: 'geojson', data: geojson });
-                  map.addLayer({
-                    id: 'route-layer-' + activeId,
-                    type: 'line',
-                    source: sourceId,
-                    paint: {
-                      'line-color': '#ffd93d',
-                      'line-width': 5,
-                      'line-dasharray': [10, 6],
-                      'line-opacity': 0.8
-                    }
-                  });
-                  showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
-                }
+                map.addSource(sourceId, { type: 'geojson', data: geojson });
+                map.addLayer({
+                  id: 'route-layer-' + activeId,
+                  type: 'line',
+                  source: sourceId,
+                  paint: {
+                    'line-color': '#ffd93d',
+                    'line-width': 5,
+                    'line-dasharray': [10, 6],
+                    'line-opacity': 0.8
+                  }
+                });
+                showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
               }
             });
           }
         });
 
+        // Stale check
         setInterval(() => {
           const now = Date.now();
           let updated = false;
@@ -829,7 +818,7 @@
       }
 
       // ============================================================
-      // 7. LEADER ACTIONS - UNCHANGED
+      // 7. LEADER ACTIONS (unchanged)
       // ============================================================
       function kickUser(userId, userName) {
         if (!isLeader) return;
@@ -910,7 +899,6 @@
           return;
         }
         if (!confirm(`Are you sure you want to leave the team?`)) return;
-
         const userRef = database.ref('teams/' + teamCode + '/' + myUserId);
         userRef.remove().then(() => {
           showToast('👋 You have left the team.');
@@ -923,7 +911,7 @@
       }
 
       // ============================================================
-      // 8. VALIDATE USERNAME - UNCHANGED
+      // 8. VALIDATE USERNAME (unchanged)
       // ============================================================
       function validateAndSetUsername(newName) {
         if (!newName || newName.trim() === '') {
@@ -953,9 +941,7 @@
               localStorage.setItem('biketeam_myname', myName);
               updateTeamList();
               broadcastMyPosition();
-              if (userMarkerId) {
-                updateMyMarker();
-              }
+              updateMyMarker();
               showToast(`✅ Username set to "${myName}"`);
               return true;
             }
@@ -966,130 +952,116 @@
       }
 
       // ============================================================
-      // 9. 🗺️ MAPLIBRE MAP INITIALIZATION
+      // 9. 🗺️ MAPLIBRE MAP INIT (FIXED style)
       // ============================================================
       function initMap() {
-  map = new maplibregl.Map({
-    container: 'map',
-    center: [0, 0],
-    zoom: 14,
-    bearing: 0,
-    pitch: 0,
-    // 🔥 FIXED: Use a free, working style (no API key needed)
-    style: 'https://tiles.openfreemap.org/styles/liberty.json'
-  });
+        map = new maplibregl.Map({
+          container: 'map',
+          center: [0, 0],
+          zoom: 14,
+          bearing: 0,
+          pitch: 0,
+          // ✅ FREE, WORKING DARK STYLE (no API key needed)
+          style: 'https://tiles.openfreemap.org/styles/liberty.json'
+        });
 
-  // Handle map load
-  map.on('load', function() {
-    mapInitialized = true;
-    console.log('🗺️ Map loaded');
-    
-    // Add controls
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
-    
-    const geolocateControl = new maplibregl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,
-      showUserHeading: true,
-      showAccuracyCircle: true
-    });
-    map.addControl(geolocateControl, 'bottom-right');
+        map.on('load', function() {
+          mapInitialized = true;
+          console.log('🗺️ Map loaded');
+          
+          // Add controls
+          map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+          const geolocateControl = new maplibregl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: true,
+            showUserHeading: true,
+            showAccuracyCircle: true
+          });
+          map.addControl(geolocateControl, 'bottom-right');
 
-    // Follow mode
-    map.on('dragstart', () => { followMode = false; });
-    map.on('dblclick', () => {
-      followMode = true;
-      if (myLastPosition) {
-        map.setCenter([myLastPosition.lng, myLastPosition.lat]);
+          // Map events
+          map.on('dragstart', () => { followMode = false; });
+          map.on('dblclick', () => {
+            followMode = true;
+            if (myLastPosition) {
+              map.setCenter([myLastPosition.lng, myLastPosition.lat]);
+            }
+          });
+          map.on('click', () => {
+            if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
+              $sidebar.classList.add('hidden');
+              $sidebar.style.transform = 'translateX(-100%)';
+            }
+          });
+
+          // Re-apply markers
+          if (myLastPosition) {
+            updateMyMarker();
+            updateMyTrail();
+          }
+          updateRemoteMarkers();
+          if (myLastPosition && followMode) {
+            map.setCenter([myLastPosition.lng, myLastPosition.lat]);
+          }
+        });
+
+        // Fallback if style fails
+        map.on('error', function() {
+          console.warn('Map style error, using fallback');
+          if (!map.getStyle()) {
+            map.setStyle('https://demotiles.maplibre.org/style.json');
+          }
+        });
       }
-    });
-
-    map.on('click', () => {
-      if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
-        $sidebar.classList.add('hidden');
-        $sidebar.style.transform = 'translateX(-100%)';
-      }
-    });
-
-    // Re-apply markers
-    if (myLastPosition) {
-      updateMyMarker();
-      updateMyTrail();
-    }
-    updateRemoteMarkers();
-    if (myLastPosition && followMode) {
-      map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-    }
-  });
-
-  // Error fallback
-  map.on('error', function() {
-    console.warn('Map style error, using fallback');
-    if (!map.getStyle()) {
-      map.setStyle('https://demotiles.maplibre.org/style.json');
-    }
-  });
-}
 
       // ============================================================
       // 10. MAPLIBRE MARKER FUNCTIONS
       // ============================================================
-      
-      // Create an HTML element for a marker
       function createMarkerElement(emoji, color, isYou = false) {
         const el = document.createElement('div');
         el.className = 'custom-marker' + (isYou ? ' you-marker' : '');
-        el.style.backgroundColor = color;
+        el.style.backgroundColor = color || '#888';
         el.textContent = emoji;
         return el;
       }
 
-      // Update or create user marker
+      // Update user marker
       function updateMyMarker() {
         if (!myLastPosition || !map || !mapInitialized) return;
         const { lat, lng } = myLastPosition;
-        
-        // Remove old marker if exists
-        if (userMarkerId) {
-          // Markers are not removed via source/layer, we need to track them differently
-          // We'll use a single marker instance
+
+        // Remove old marker
+        if (myMarker) {
+          myMarker.remove();
+          myMarker = null;
         }
-        
-        // Create marker using MapLibre's Marker
-        if (window._userMarker) {
-          window._userMarker.remove();
-          window._userMarker = null;
-        }
-        
+
         const el = createMarkerElement('🚴', myColor, true);
         el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
-        
-        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+
+        myMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([lng, lat])
           .addTo(map);
-        window._userMarker = marker;
-        
-        // Create popup
+
         const popup = new maplibregl.Popup({ offset: 25 })
           .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
-        marker.setPopup(popup);
+        myMarker.setPopup(popup);
       }
 
       // Update user trail
       function updateMyTrail() {
         if (myRoutePoints.length < 2 || !map || !mapInitialized) return;
-        
+
         // Remove old trail
-        if (userTrailId) {
+        if (myTrailSourceId) {
           try {
-            if (map.getSource(userTrailId)) {
-              map.removeLayer(userTrailId);
-              map.removeSource(userTrailId);
-            }
+            if (map.getLayer(myTrailLayerId)) map.removeLayer(myTrailLayerId);
+            if (map.getSource(myTrailSourceId)) map.removeSource(myTrailSourceId);
           } catch(e) {}
-          userTrailId = null;
+          myTrailSourceId = null;
+          myTrailLayerId = null;
         }
-        
+
         const geojson = {
           type: 'Feature',
           geometry: {
@@ -1097,13 +1069,16 @@
             coordinates: myRoutePoints.map(p => [p[1], p[0]])
           }
         };
-        
+
         const sourceId = 'user-trail-' + myUserId;
-        userTrailId = sourceId;
+        const layerId = 'user-trail-layer-' + myUserId;
+        myTrailSourceId = sourceId;
+        myTrailLayerId = layerId;
+
         try {
           map.addSource(sourceId, { type: 'geojson', data: geojson });
           map.addLayer({
-            id: 'user-trail-layer-' + myUserId,
+            id: layerId,
             type: 'line',
             source: sourceId,
             paint: {
@@ -1120,56 +1095,41 @@
       // Remote markers
       function updateRemoteMarkers() {
         if (!map || !mapInitialized) return;
-        
-        // For each remote user, update or create marker and trail
+
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
-          
-          // Marker
-          if (!remoteMarkers[uid]) {
-            const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
-            const opacity = isOffline ? 0.5 : 1;
-            const el = createMarkerElement('🚴‍♂️', u.color || '#888', false);
-            el.style.opacity = opacity;
-            el.title = `${u.userName || 'Rider'} - ${(u.speed || 0).toFixed(1)} km/h`;
-            
-            const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-              .setLngLat([u.lng, u.lat])
-              .addTo(map);
-            
-            const popup = new maplibregl.Popup({ offset: 25 })
-              .setHTML(`<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
-            marker.setPopup(popup);
-            
-            remoteMarkers[uid] = marker;
-          } else {
-            // Update existing marker
-            const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
-            remoteMarkers[uid].setLngLat([u.lng, u.lat]);
-            remoteMarkers[uid]._element.style.opacity = isOffline ? 0.5 : 1;
-            
-            // Update popup
-            const popup = remoteMarkers[uid].getPopup();
-            if (popup) {
-              popup.setHTML(`<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
-            }
+
+          // Remove old marker if exists (we'll recreate it with updated data)
+          if (remoteMarkers[uid]) {
+            remoteMarkers[uid].remove();
+            remoteMarkers[uid] = null;
           }
-          
+
+          const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
+          const el = createMarkerElement('🚴‍♂️', u.color || '#888', false);
+          el.style.opacity = isOffline ? 0.5 : 1;
+
+          const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat([u.lng, u.lat])
+            .addTo(map);
+
+          const popup = new maplibregl.Popup({ offset: 25 })
+            .setHTML(`<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
+          marker.setPopup(popup);
+
+          remoteMarkers[uid] = marker;
+
           // Trail
           if (u.routePoints && u.routePoints.length >= 2) {
-            // Remove old trail
             if (remoteTrails[uid]) {
               try {
                 const oldId = remoteTrails[uid];
-                if (map.getSource(oldId)) {
-                  map.removeLayer(oldId);
-                  map.removeSource(oldId);
-                }
+                if (map.getLayer(oldId)) map.removeLayer(oldId);
+                if (map.getSource(oldId)) map.removeSource(oldId);
               } catch(e) {}
               remoteTrails[uid] = null;
             }
-            
             const geojson = {
               type: 'Feature',
               geometry: {
@@ -1178,11 +1138,12 @@
               }
             };
             const sourceId = 'remote-trail-' + uid;
+            const layerId = 'remote-trail-layer-' + uid;
             remoteTrails[uid] = sourceId;
             try {
               map.addSource(sourceId, { type: 'geojson', data: geojson });
               map.addLayer({
-                id: 'remote-trail-layer-' + uid,
+                id: layerId,
                 type: 'line',
                 source: sourceId,
                 paint: {
@@ -1208,10 +1169,8 @@
         if (remoteTrails[uid]) {
           try {
             const id = remoteTrails[uid];
-            if (map.getSource(id)) {
-              map.removeLayer(id);
-              map.removeSource(id);
-            }
+            if (map.getLayer(id)) map.removeLayer(id);
+            if (map.getSource(id)) map.removeSource(id);
           } catch(e) {}
           delete remoteTrails[uid];
         }
@@ -1245,7 +1204,7 @@
             myLastPosition = newPos;
 
             updateMyStats();
-            updateMyMarker();
+            updateMyMarker();      // ✅ Updates bike marker position
             updateMyTrail();
             broadcastMyPosition();
 
@@ -1264,7 +1223,7 @@
             $statusDot.style.background = 'var(--danger)';
             showToast(`⚠️ ${msg}. Use manual location.`);
             if (!myLastPosition && map) {
-              map.setCenter([40.7128, -74.006]);
+              map.setCenter([0, 0]);
             }
           },
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
@@ -1294,7 +1253,7 @@
       }
 
       // ============================================================
-      // 12. 🧭 COMPASS / ORIENTATION (MapLibre native rotation)
+      // 12. COMPASS / ORIENTATION
       // ============================================================
       let isOrientationActive = false;
 
@@ -1396,7 +1355,7 @@
       }
 
       // ============================================================
-      // 15. UI UPDATES - MOSTLY UNCHANGED
+      // 15. UI UPDATES (unchanged)
       // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
@@ -1475,12 +1434,11 @@
             `;
           }).join('');
         }
-
         updateAdminPanel();
       }
 
       // ============================================================
-      // 16. ADMIN PANEL - UNCHANGED
+      // 16. ADMIN PANEL (unchanged)
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -1502,7 +1460,6 @@
           });
 
           let html = `<div class="admin-title">👑 Team Admin</div>`;
-          
           html += `<div style="background:var(--card); padding:8px 12px; border-radius:8px; margin-bottom:12px; text-align:center;">
             <span style="color:var(--text-secondary); font-size:0.7rem;">🔑 Share this code with your team</span><br>
             <span id="teamCodeDisplay" style="font-size:2rem; font-weight:bold; color:var(--accent2); letter-spacing:6px;">${codeDisplay}</span>
@@ -1591,28 +1548,26 @@
       };
 
       // ============================================================
-      // 17. TRACKING CONTROLS - UNCHANGED
+      // 17. TRACKING CONTROLS (unchanged)
       // ============================================================
       function startTracking() {
         if (!myLastPosition) {
           showToast('⚠️ No location yet. Wait for GPS or set manual location.');
           return;
         }
-
         clearRideSession();
-
         isTracking = true;
         trackStartTime = Date.now();
         myTotalDistance = 0;
         myRoutePoints = [[myLastPosition.lat, myLastPosition.lng]];
-        if (userTrailId) {
+        // Remove old trail
+        if (myTrailSourceId && map) {
           try {
-            if (map && map.getSource(userTrailId)) {
-              map.removeLayer(userTrailId);
-              map.removeSource(userTrailId);
-            }
+            if (map.getLayer(myTrailLayerId)) map.removeLayer(myTrailLayerId);
+            if (map.getSource(myTrailSourceId)) map.removeSource(myTrailSourceId);
           } catch(e) {}
-          userTrailId = null;
+          myTrailSourceId = null;
+          myTrailLayerId = null;
         }
         $btnStart.style.display = 'none';
         $btnStop.style.display = 'inline-flex';
@@ -1657,7 +1612,7 @@
       }
 
       // ============================================================
-      // 18. RIDE SESSION PERSISTENCE - UNCHANGED
+      // 18. RIDE SESSION PERSISTENCE (unchanged)
       // ============================================================
       const SESSION_KEY = 'biketeam_ridesession';
 
@@ -1684,7 +1639,7 @@
           const raw = localStorage.getItem(SESSION_KEY);
           if (!raw) return null;
           const session = JSON.parse(raw);
-          if (Date.now() - session.timestamp > 3600000) {
+          if (Date.now() - session.timestamp > 3600000) { // 1 hour timeout
             localStorage.removeItem(SESSION_KEY);
             return null;
           }
@@ -1699,7 +1654,7 @@
       }
 
       // ============================================================
-      // 19. TEST FIREBASE - UNCHANGED
+      // 19. TEST FIREBASE (unchanged)
       // ============================================================
       function testFirebaseConnection() {
         if (!teamCode) return;
@@ -1716,11 +1671,13 @@
       // 20. EVENT LISTENERS
       // ============================================================
 
+      // Compass button
       const $compassBtn = document.getElementById('btnEnableCompass');
       if ($compassBtn) {
         $compassBtn.addEventListener('click', enableCompass);
       }
 
+      // Sidebar toggle
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
         if (window.innerWidth <= 768) {
@@ -1735,6 +1692,7 @@
         }
       });
 
+      // Map buttons
       $followBtn.addEventListener('click', () => {
         followMode = true;
         if (myLastPosition && map) {
@@ -1755,7 +1713,7 @@
 
       $btnManualLocation.addEventListener('click', promptManualLocation);
       $manualBtn.addEventListener('click', promptManualLocation);
-      
+
       const $northBtn = document.getElementById('northBtn');
       if ($northBtn) {
         $northBtn.addEventListener('click', () => {
@@ -1769,6 +1727,7 @@
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
+      // Status change
       $statusSelect.addEventListener('change', function() {
         myStatus = this.value;
         localStorage.setItem('biketeam_mystatus', myStatus);
@@ -1777,6 +1736,7 @@
         updateMyMarker();
       });
 
+      // Name change
       $myNameInput.addEventListener('change', function() {
         const newName = this.value.trim();
         if (newName && newName !== myName) {
@@ -1800,6 +1760,7 @@
         }
       });
 
+      // Keyboard shortcuts
       document.addEventListener('keydown', (e) => {
         if (e.key === 'f' && document.activeElement === document.body) { $followBtn.click(); }
         if (e.key === 's' && document.activeElement === document.body) { if (!isTracking) startTracking(); else stopTracking(); }
@@ -1813,10 +1774,12 @@
         }
       });
 
+      // Periodic broadcast
       setInterval(() => {
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
+      // Save ride session
       setInterval(() => {
         saveRideSession();
       }, 5000);
