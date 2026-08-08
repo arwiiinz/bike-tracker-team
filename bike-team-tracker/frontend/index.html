@@ -23,7 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* ===== YOUR EXISTING STYLES (unchanged) ===== */
+    /* ===== ALL STYLES (unchanged) ===== */
     :root {
       --bg: #0a0a14;
       --panel: rgba(22, 33, 62, 0.85);
@@ -1078,7 +1078,6 @@
 
             if (!newActiveId) {
               showToast('🗺️ Route cleared.');
-              // Optionally clear start point? We keep start separate.
               return;
             }
 
@@ -1129,7 +1128,6 @@
               startMarker = null;
             }
             if (startData && startData.lat && startData.lng && map && mapInitialized) {
-              // Create a marker with a flag emoji
               const el = document.createElement('div');
               el.className = 'start-flag-marker';
               el.textContent = '🚩';
@@ -1482,7 +1480,9 @@
         reader.readAsText(file);
       }
 
-      // ===== START POINT CONTROLS (Leader only) =====
+      // ============================================================
+      // 🔥 FIXED: SET START POINT – ALSO MOVES THE BIKE MARKER
+      // ============================================================
       function setStartPoint() {
         if (!isLeader) {
           showToast('Only the leader can set the start point.', true);
@@ -1501,9 +1501,28 @@
           }
           const firstPoint = route.points[0];
           const startData = { lat: firstPoint[0], lng: firstPoint[1] };
+          // Save the start point to Firebase for everyone
           database.ref('teams/' + teamCode + '/startPoint').set(startData)
             .then(() => {
               showToast('🏁 Start point set at the beginning of the route.');
+
+              // 🔥 MOVE THE LEADER'S BIKE MARKER TO THE START POINT
+              myLastPosition = {
+                lat: firstPoint[0],
+                lng: firstPoint[1],
+                speed: 0,
+                heading: null,
+                altitude: null,
+                timestamp: Date.now()
+              };
+              // Update the marker on the map
+              updateMyMarker();
+              // Center the map on the start point
+              map.setCenter([firstPoint[1], firstPoint[0]]);
+              map.setZoom(16);
+              // Broadcast the new position so other riders see the leader at the start
+              broadcastMyPosition();
+              showToast('📍 Your bike marker is now at the start point.');
             })
             .catch((err) => {
               showToast('❌ Failed to set start point: ' + err.message, true);
