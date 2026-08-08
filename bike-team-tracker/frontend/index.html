@@ -568,7 +568,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <!-- Compass button removed from header -->
+    <!-- 🔥 COMPASS BUTTON REMOVED FROM HEADER -->
   </header>
 
   <div class="main-container">
@@ -668,7 +668,8 @@
       const TRAIL_UPDATE_INTERVAL_MS = 10000;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
-      const CLUSTER_DISTANCE_KM = 0.01; // 10 meters
+      // 🔥 CLUSTER DISTANCE SET TO 50 METERS (0.05 KM)
+      const CLUSTER_DISTANCE_KM = 0.05;
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
         '#4ecdc4', '#ffe66d', '#a29bfe'
       ];
@@ -1624,7 +1625,8 @@
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
           if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            showToast('🍎 Tap "North" button to enable compass rotation.', false);
+            // No toast spam, just quietly activate on iOS
+            console.log('iOS: compass permission required');
           } else {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass active – map rotates with your phone!');
@@ -1914,7 +1916,6 @@
       }
 
       window.highlightUser = function(uid) {
-        // Find the cluster containing this user and center on it
         if (uid === myUserId && myLastPosition) {
           if (map) map.setCenter([myLastPosition.lng, myLastPosition.lat]);
           followMode = true;
