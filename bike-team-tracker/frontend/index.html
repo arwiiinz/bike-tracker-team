@@ -131,14 +131,6 @@
       min-height: var(--touch-target);
       background: transparent;
     }
-    .btn-start {
-      background: var(--success);
-      color: #000;
-    }
-    .btn-stop {
-      background: var(--danger);
-      color: #fff;
-    }
     .btn:active {
       transform: scale(0.95);
     }
@@ -211,7 +203,6 @@
       line-height: 1;
     }
 
-    /* Sidebar scrollable content */
     .sidebar-content {
       flex: 1;
       overflow-y: auto;
@@ -460,7 +451,6 @@
       font-size: 0.7rem;
     }
 
-    /* Name input */
     #myNameInput {
       flex: 2;
       min-width: 100px;
@@ -546,23 +536,25 @@
       right: 14px;
     }
 
-    /* ===== TOP STATS OVERLAY ===== */
+    /* ================================================================
+       🔥 TOP STATS OVERLAY – MORE VISIBLE
+       ================================================================ */
     #stats-overlay {
       position: absolute;
       top: 12px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 500;
-      background: var(--panel);
+      background: rgba(10, 10, 20, 0.85);
       backdrop-filter: blur(16px);
-      border: 1px solid var(--border);
+      border: 1.5px solid rgba(0, 210, 255, 0.25);
       border-radius: var(--radius);
-      padding: 8px 18px;
+      padding: 10px 22px;
       display: flex;
-      gap: 20px;
+      gap: 24px;
       align-items: center;
-      box-shadow: var(--shadow);
-      min-width: 200px;
+      box-shadow: 0 4px 30px rgba(0, 210, 255, 0.15), 0 0 60px rgba(0, 210, 255, 0.05);
+      min-width: 220px;
       justify-content: center;
       pointer-events: none;
       transition: opacity 0.3s;
@@ -572,60 +564,96 @@
       pointer-events: none;
     }
     #stats-overlay .stat-value {
-      font-size: 1.1rem;
-      font-weight: 700;
+      font-size: 1.4rem;
+      font-weight: 800;
       color: var(--accent2);
       line-height: 1.2;
+      text-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+      letter-spacing: 0.5px;
     }
     #stats-overlay .stat-label {
       font-size: 0.5rem;
       color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
+      margin-top: 1px;
+      font-weight: 600;
     }
     #stats-overlay .divider {
       width: 1px;
-      height: 28px;
+      height: 32px;
       background: var(--border);
     }
 
-    /* ===== BOTTOM START/STOP BUTTON ===== */
+    /* ================================================================
+       🔥 BOTTOM START/STOP OVERLAY – BIGGER, GLOWING
+       ================================================================ */
     #controls-overlay {
       position: absolute;
-      bottom: 24px;
+      bottom: 30px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 500;
       display: flex;
-      gap: 12px;
+      gap: 16px;
       align-items: center;
       pointer-events: none;
     }
     #controls-overlay .btn {
       pointer-events: auto;
-      font-size: 1rem;
-      padding: 12px 32px;
-      border-radius: 30px;
-      min-height: 52px;
-      min-width: 120px;
+      font-size: 1.2rem;
+      padding: 14px 40px;
+      border-radius: 40px;
+      min-height: 60px;
+      min-width: 140px;
       justify-content: center;
-      box-shadow: var(--shadow);
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+      font-weight: 800;
+      letter-spacing: 1px;
+      border: none;
+      transition: all 0.3s ease;
+      position: relative;
     }
+    #controls-overlay .btn:active {
+      transform: scale(0.93);
+    }
+
+    /* Start button – glowing green */
     #controls-overlay .btn-start {
-      background: var(--success);
-      color: #000;
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      color: #fff;
+      box-shadow: 0 0 30px rgba(46, 204, 113, 0.4), 0 8px 40px rgba(0, 0, 0, 0.5);
     }
     #controls-overlay .btn-start:hover {
-      transform: scale(1.03);
+      box-shadow: 0 0 50px rgba(46, 204, 113, 0.6), 0 8px 40px rgba(0, 0, 0, 0.5);
+      transform: scale(1.02);
     }
+
+    /* Stop button – glowing red */
     #controls-overlay .btn-stop {
-      background: var(--danger);
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
       color: #fff;
+      box-shadow: 0 0 30px rgba(231, 76, 60, 0.4), 0 8px 40px rgba(0, 0, 0, 0.5);
     }
     #controls-overlay .btn-stop:hover {
-      transform: scale(1.03);
+      box-shadow: 0 0 50px rgba(231, 76, 60, 0.6), 0 8px 40px rgba(0, 0, 0, 0.5);
+      transform: scale(1.02);
+    }
+
+    /* Pulsing ring animation when idle */
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4);
+      }
+      70% {
+        box-shadow: 0 0 0 20px rgba(46, 204, 113, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0);
+      }
+    }
+    #controls-overlay .btn-start.idle {
+      animation: pulse-ring 2s ease-in-out infinite;
     }
 
     /* ===== TOAST ===== */
@@ -780,25 +808,25 @@
       }
       #stats-overlay {
         top: 8px;
-        padding: 6px 14px;
-        gap: 12px;
+        padding: 8px 16px;
+        gap: 14px;
         min-width: 160px;
         border-radius: 12px;
       }
       #stats-overlay .stat-value {
-        font-size: 0.9rem;
+        font-size: 1.1rem;
       }
       #stats-overlay .stat-label {
         font-size: 0.45rem;
       }
       #controls-overlay {
-        bottom: 16px;
+        bottom: 20px;
       }
       #controls-overlay .btn {
-        font-size: 0.85rem;
-        padding: 10px 24px;
-        min-height: 44px;
-        min-width: 100px;
+        font-size: 1rem;
+        padding: 12px 28px;
+        min-height: 50px;
+        min-width: 110px;
       }
       .modal-box {
         padding: 20px 16px;
@@ -823,21 +851,22 @@
         --sidebar-w: 260px;
       }
       #stats-overlay {
-        gap: 8px;
-        padding: 4px 10px;
-        min-width: 120px;
+        gap: 10px;
+        padding: 6px 12px;
+        min-width: 130px;
+        top: 6px;
       }
       #stats-overlay .stat-value {
-        font-size: 0.75rem;
+        font-size: 0.9rem;
       }
       #stats-overlay .divider {
-        height: 20px;
+        height: 18px;
       }
       #controls-overlay .btn {
-        font-size: 0.75rem;
-        padding: 8px 18px;
-        min-height: 40px;
-        min-width: 80px;
+        font-size: 0.85rem;
+        padding: 10px 20px;
+        min-height: 44px;
+        min-width: 90px;
       }
       .member-card {
         padding: 6px 10px;
@@ -967,7 +996,7 @@
 
       <!-- ===== BOTTOM START/STOP OVERLAY ===== -->
       <div id="controls-overlay">
-        <button class="btn btn-start" id="btnStart">▶ Start</button>
+        <button class="btn btn-start idle" id="btnStart">▶ Start</button>
         <button class="btn btn-stop" id="btnStop" style="display:none;">⏹ Stop</button>
       </div>
     </div>
@@ -1233,6 +1262,9 @@
           $statusText.textContent = 'LIVE';
           $statusText.style.color = 'var(--success)';
           showToast('🔄 Ride restored from idle state.');
+        } else {
+          // Start button idle animation
+          $btnStart.classList.add('idle');
         }
 
         if (window.innerWidth <= 768) {
@@ -2245,6 +2277,7 @@
         updateMyTrail();
         $btnStart.style.display = 'none';
         $btnStop.style.display = 'inline-flex';
+        $btnStart.classList.remove('idle');
         $statusText.textContent = 'LIVE';
         $statusText.style.color = 'var(--success)';
         updateMyStats();
@@ -2261,6 +2294,7 @@
         isTracking = false;
         trackStartTime = null;
         $btnStart.style.display = 'inline-flex';
+        $btnStart.classList.add('idle');
         $btnStop.style.display = 'none';
         $statusText.textContent = useManualLocation ? 'MANUAL' : 'CONNECTED';
         $statusText.style.color = useManualLocation ? 'var(--accent2)' : 'var(--success)';
