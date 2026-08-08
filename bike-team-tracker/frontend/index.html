@@ -23,7 +23,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* ===== YOUR STYLES (unchanged) ===== */
     :root {
       --bg: #1a1a2e;
       --panel: #16213e;
@@ -169,6 +168,7 @@
     .locate-btn { bottom: 44px; right: 14px; }
     .manual-btn { bottom: 156px; right: 14px; }
     .north-btn { bottom: 212px; right: 14px; }
+    .fix-marker-btn { bottom: 268px; right: 14px; font-size: 0.8rem; background: var(--accent); color: #fff; }
 
     .floating-panel {
       position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
@@ -225,6 +225,7 @@
       .toggle-sidebar { top: 8px; left: 8px; width: 40px; height: 40px; }
       .floating-panel { bottom: 10px; padding: 6px 14px; gap: 12px; border-radius: 24px; }
       .map-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+      .fix-marker-btn { bottom: 220px; right: 14px; }
     }
     @media (max-width: 480px) {
       :root { --header-h: 44px; --sidebar-w: 260px; }
@@ -239,19 +240,24 @@
     .custom-marker {
       display: flex; align-items: center; justify-content: center;
       width: 42px; height: 42px; border-radius: 50%;
-      font-size: 1.6rem; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
-      transition: transform 0.15s; cursor: pointer;
+      font-size: 1.6rem;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+      transition: transform 0.15s;
+      cursor: pointer;
       background: var(--panel);
       border: 2px solid transparent;
     }
     .custom-marker.you-marker {
       animation: bounce-marker 0.6s ease infinite alternate;
-      font-size: 2rem; width: 50px; height: 50px;
+      font-size: 2rem;
+      width: 50px;
+      height: 50px;
       border-color: var(--accent2);
       box-shadow: 0 0 20px rgba(0,210,255,0.4);
     }
     @keyframes bounce-marker {
-      from { transform: translateY(0); } to { transform: translateY(-5px); }
+      from { transform: translateY(0); }
+      to { transform: translateY(-5px); }
     }
 
     .admin-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
@@ -286,7 +292,6 @@
   </style>
 </head>
 <body>
-  <!-- Header -->
   <header class="header">
     <span style="font-size:1.4rem;">🚴</span>
     <span class="logo">Bike<span>Team</span></span>
@@ -298,7 +303,6 @@
   </header>
 
   <div class="main-container">
-    <!-- Sidebar -->
     <aside class="sidebar hidden" id="sidebar">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
         <h3 style="margin:0; font-size:1rem; color:var(--accent2);">👥 Team Panel</h3>
@@ -338,13 +342,14 @@
       </div>
     </aside>
 
-    <!-- Map -->
     <div class="map-container">
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
       <button class="map-btn north-btn" id="northBtn" title="Reset to North">🧭</button>
       <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
       <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
       <button class="map-btn manual-btn" id="manualBtn" title="Set manual location">✏️</button>
+      <button class="map-btn fix-marker-btn" id="fixMarkerBtn" title="Fix Marker Position">🔧</button>
+      
       <div id="map"></div>
       <div class="floating-panel" id="floatingPanel">
         <div class="mini-stat"><div class="mini-val" id="miniSpeed">0.0</div><div class="mini-lbl">km/h</div></div>
@@ -374,7 +379,7 @@
       const database = firebase.database();
 
       // ============================================================
-      // USER ID
+      // USER ID & STATE
       // ============================================================
       let myUserId = localStorage.getItem('biketeam_userid');
       if (!myUserId) {
@@ -383,9 +388,6 @@
       }
       console.log(`🆔 User ID: ${myUserId}`);
 
-      // ============================================================
-      // STATE
-      // ============================================================
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
@@ -575,7 +577,6 @@
         $myNameInput.value = myName;
         $statusSelect.value = myStatus;
 
-        // Restore ride session
         const session = restoreRideSession();
         if (session && session.isTracking && session.lastPos) {
           isTracking = true;
@@ -703,7 +704,6 @@
           updateTeamList();
         });
 
-        // Routes
         const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
         savedRoutesRef.on('value', (snapshot) => {
           const routes = snapshot.val();
@@ -1002,7 +1002,7 @@
       }
 
       // ============================================================
-      // MARKER HELPERS
+      // MARKER HELPERS (FIXED & WITH DEBUG LOGS)
       // ============================================================
       function createMarkerElement(emoji, color, isYou = false) {
         const el = document.createElement('div');
@@ -1012,25 +1012,62 @@
         return el;
       }
 
+      function forceFixMarkers() {
+        console.log('🔧 Force fixing markers...');
+        if (myLastPosition) {
+          const { lat, lng } = myLastPosition;
+          console.log(`📍 Force fixing to: ${lat}, ${lng}`);
+          // Remove existing marker and recreate
+          if (myMarker) {
+            myMarker.remove();
+            myMarker = null;
+          }
+          const el = createMarkerElement('🚴', myColor, true);
+          el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
+          myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([lng, lat])
+            .addTo(map);
+          const popup = new maplibregl.Popup({ offset: [0, -15] })
+            .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
+          myMarker.setPopup(popup);
+          map.setCenter([lng, lat]);
+          showToast('✅ Marker position fixed!');
+        } else {
+          showToast('⚠️ No position available. Set manual location first.', true);
+        }
+      }
+
       function updateMyMarker() {
         if (!myLastPosition || !map || !mapInitialized) return;
         const { lat, lng } = myLastPosition;
 
-        if (myMarker) {
-          myMarker.remove();
-          myMarker = null;
+        // ✅ Skip invalid coordinates
+        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) {
+          console.warn('⚠️ Invalid coordinates, skipping marker update:', { lat, lng });
+          return;
         }
 
-        const el = createMarkerElement('🚴', myColor, true);
-        el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
+        console.log(`📍 Updating my marker to: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
 
-        myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([lng, lat])
-          .addTo(map);
-
-        const popup = new maplibregl.Popup({ offset: [0, -15] })
-          .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
-        myMarker.setPopup(popup);
+        if (myMarker) {
+          // Update existing marker
+          myMarker.setLngLat([lng, lat]);
+          // Update popup content
+          const popup = myMarker.getPopup();
+          if (popup) {
+            popup.setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
+          }
+        } else {
+          // Create new marker
+          const el = createMarkerElement('🚴', myColor, true);
+          el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
+          myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([lng, lat])
+            .addTo(map);
+          const popup = new maplibregl.Popup({ offset: [0, -15] })
+            .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
+          myMarker.setPopup(popup);
+        }
       }
 
       function updateMyTrail() {
@@ -1075,6 +1112,7 @@
         }
       }
 
+      // Remote markers
       function updateRemoteMarkers() {
         if (!map || !mapInitialized) return;
 
@@ -1082,7 +1120,6 @@
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
 
-          // Remove old marker and recreate to avoid stale popups
           if (remoteMarkers[uid]) {
             remoteMarkers[uid].remove();
             remoteMarkers[uid] = null;
@@ -1102,7 +1139,6 @@
 
           remoteMarkers[uid] = marker;
 
-          // Trail
           if (u.routePoints && u.routePoints.length >= 2) {
             if (remoteTrails[uid]) {
               try {
@@ -1185,7 +1221,7 @@
             myLastPosition = newPos;
 
             updateMyStats();
-            updateMyMarker();
+            updateMyMarker();      
             updateMyTrail();
             broadcastMyPosition();
 
@@ -1699,6 +1735,12 @@
             showToast('🧭 Map reset to North');
           }
         });
+      }
+
+      // 🔧 Fix Marker Button
+      const $fixMarkerBtn = document.getElementById('fixMarkerBtn');
+      if ($fixMarkerBtn) {
+        $fixMarkerBtn.addEventListener('click', forceFixMarkers);
       }
 
       $btnStart.addEventListener('click', startTracking);
