@@ -23,7 +23,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* ===== YOUR FULL STYLES (unchanged – kept exactly as you had them) ===== */
     :root {
       --bg: #0a0a14;
       --panel: rgba(22, 33, 62, 0.85);
@@ -649,7 +648,7 @@
 
       // ===== STATE =====
       const UPDATE_INTERVAL_MS = 1500;
-      const TRAIL_UPDATE_INTERVAL_MS = 10000; // ✅ UPDATE TRAIL EVERY 10 SECONDS (NOT 1.5s)
+      const TRAIL_UPDATE_INTERVAL_MS = 10000;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
@@ -673,7 +672,7 @@
       let isLeader = false;
 
       const remoteUsers = {};
-      const remoteTrailPoints = {}; // Store trails separately
+      const remoteTrailPoints = {};
 
       let map = null;
       let mapInitialized = false;
@@ -922,7 +921,6 @@
         myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
         locationsRef = database.ref('teams/' + teamCode);
 
-        // Location listeners (for live markers)
         locationsRef.on('child_added', (snapshot) => {
           if (snapshot.key === myUserId) return;
           if (snapshot.key === '_meta') {
@@ -985,13 +983,8 @@
           updateTeamList();
         });
 
-        // ============================================================
-        // ✅ NEW: SEPARATE TRAIL LISTENER (UPDATED EVERY 10 SECONDS)
-        // ============================================================
-        // Store my trail in a separate node
+        // Trail listener
         myTrailRef = database.ref('teams/' + teamCode + '/trails/' + myUserId);
-
-        // Listen for trail changes from other riders
         trailsRef = database.ref('teams/' + teamCode + '/trails');
         trailsRef.on('child_added', (snapshot) => {
           const uid = snapshot.key;
@@ -1011,15 +1004,12 @@
             remoteTrailPoints[uid] = data.points;
             updateRemoteTrail(uid, data.points);
           } else if (data && data.points && data.points.length === 0) {
-            // Trail cleared
             remoteTrailPoints[uid] = [];
             removeRemoteTrail(uid);
           }
         });
 
-        // ============================================================
-        // ROUTE LISTENERS
-        // ============================================================
+        // Routes
         if (teamCode !== 'openworld') {
           const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
           savedRoutesRef.on('value', () => {
@@ -1070,7 +1060,6 @@
           });
         }
 
-        // Stale check
         setInterval(() => {
           const now = Date.now();
           let updated = false;
@@ -1092,9 +1081,6 @@
         }, 5000);
       }
 
-      // ============================================================
-      // ✅ BROADCAST MY POSITION (NOW WITHOUT TRAIL)
-      // ============================================================
       function broadcastMyPosition() {
         if (!myLastPosition || !myLocationRef) return;
         const data = {
@@ -1108,32 +1094,22 @@
           timestamp: Date.now(),
           isTracking: isTracking,
           status: myStatus
-          // ✅ REMOVED: routePoints to save bandwidth
         };
         myLocationRef.set(data).catch((error) => {
           showToast('❌ Firebase Error: ' + error.message, true);
         });
       }
 
-      // ============================================================
-      // ✅ UPDATE MY TRAIL SEPARATELY (EVERY 10 SECONDS)
-      // ============================================================
       function updateMyTrailToFirebase() {
         if (!isTracking || myRoutePoints.length < 2 || !myTrailRef) return;
         myTrailRef.set({
           points: myRoutePoints.slice(-MAX_TRAIL_POINTS),
           updatedAt: Date.now()
-        }).catch((error) => {
-          // Silent fail for trail updates to avoid spamming toasts
-        });
+        }).catch(() => {});
       }
 
-      // ============================================================
-      // REMOTE TRAIL UPDATER
-      // ============================================================
       function updateRemoteTrail(uid, points) {
         if (!map || !mapInitialized) return;
-        // Remove old trail
         if (remoteTrails[uid]) {
           try {
             const oldId = remoteTrails[uid];
@@ -1170,9 +1146,7 @@
         } catch (e) {}
       }
 
-      // ============================================================
-      // MARKERS (REMOTE) - TRAILS ARE HANDLED SEPARATELY NOW
-      // ============================================================
+      // ===== MARKERS =====
       function updateRemoteMarkers() {
         if (!map || !mapInitialized) return;
         for (const uid in remoteUsers) {
@@ -1215,9 +1189,7 @@
         }
       }
 
-      // ============================================================
-      // LEADER ACTIONS (unchanged)
-      // ============================================================
+      // ===== LEADER ACTIONS =====
       function kickUser(userId, userName) {
         if (!isLeader || teamCode === 'openworld') return;
         if (userId === myUserId) return;
@@ -1568,6 +1540,7 @@
 
       // ===== COMPASS =====
       let isOrientationActive = false;
+      let lastCompassBearing = 0;
 
       function updateMapBearing(bearingDeg) {
         if (map && !isNaN(bearingDeg)) {
@@ -1579,7 +1552,11 @@
         const alpha = event.alpha;
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
-          updateMapBearing(360 - alpha);
+          lastCompassBearing = 360 - alpha;
+          // ✅ Only rotate the map if tracking is active
+          if (isTracking) {
+            updateMapBearing(lastCompassBearing);
+          }
         }
       }
 
@@ -1672,7 +1649,6 @@
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
-          // Use trail points for distance estimation
           const trailPts = remoteTrailPoints[uid] || [];
           members.push({
             id: uid,
@@ -1918,6 +1894,15 @@
           [myLastPosition.lat, myLastPosition.lng]
         ];
         updateMyTrail();
+
+        // 🧭 Resume compass rotation immediately
+        if (isOrientationActive && map) {
+          // Apply the last known compass bearing
+          if (lastCompassBearing !== 0) {
+            updateMapBearing(lastCompassBearing);
+          }
+        }
+
         $btnStart.style.display = 'none';
         $btnStop.style.display = 'inline-flex';
         $btnStart.classList.remove('idle');
@@ -1926,7 +1911,6 @@
         updateMyStats();
         updateTeamList();
         broadcastMyPosition();
-        // Send initial trail
         updateMyTrailToFirebase();
         showToast('🚴 Ride started!');
         if (myLastPosition && map) {
@@ -1946,7 +1930,12 @@
         updateMyStats();
         updateTeamList();
         broadcastMyPosition();
-        // Clear trail from Firebase when stopped
+
+        // 🔒 Lock map to North when stopped
+        if (map) {
+          map.setBearing(0);
+        }
+
         if (myTrailRef) {
           myTrailRef.remove().catch(() => {});
         }
@@ -2102,12 +2091,10 @@
         }
       });
 
-      // Location broadcast interval (every 1.5s)
       setInterval(() => {
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
-      // ✅ Trail update interval (every 10s)
       setInterval(() => {
         if (isTracking && myLastPosition) {
           updateMyTrailToFirebase();
