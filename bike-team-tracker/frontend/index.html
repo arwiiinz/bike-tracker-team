@@ -926,10 +926,10 @@ activeRouteRef.on('value', (snapshot) => {
           attributionControl: true
         });
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap',
-          maxZoom: 19
-        }).addTo(map);
+      L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap, &copy; CartoDB',
+  maxZoom: 19
+}).addTo(map);
 
         markerLayerGroup.addTo(map);
         trailLayerGroup.addTo(map);
