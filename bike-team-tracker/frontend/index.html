@@ -5,7 +5,7 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>🚴 BikeTeam Tracker – Live Cycling Monitor</title>
-  
+
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,316 +23,956 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* ===== ALL STYLES (unchanged) ===== */
     :root {
-      --bg: #1a1a2e;
-      --panel: #16213e;
-      --card: #0f3460;
+      --bg: #0a0a14;
+      --panel: rgba(22, 33, 62, 0.85);
+      --card: rgba(15, 52, 96, 0.7);
       --accent: #e94560;
       --accent2: #00d2ff;
-      --text: #e0e0e0;
-      --text-secondary: #a0a0b8;
-      --border: #2a2a4a;
+      --text: #e8e8f0;
+      --text-secondary: #9090a8;
+      --border: rgba(42, 42, 74, 0.5);
       --success: #2ecc71;
       --warning: #f39c12;
       --danger: #e74c3c;
       --sidebar-w: 320px;
-      --header-h: 52px;
-      --radius: 14px;
-      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --header-h: 48px;
+      --radius: 16px;
+      --shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+      --glass: rgba(10, 10, 20, 0.6);
       --touch-target: 44px;
     }
 
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
-      height: 100vh; width: 100vw; overflow: hidden;
-      display: flex; flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
 
+    /* ===== HEADER ===== */
     .header {
-      height: var(--header-h); background: var(--panel);
+      height: var(--header-h);
+      background: var(--panel);
+      backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; padding: 0 12px; gap: 8px;
-      z-index: 1000; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      z-index: 1000;
+      flex-shrink: 0;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
     }
-    .header .logo { font-size: 1.3rem; font-weight: 700; white-space: nowrap; letter-spacing: -0.5px; }
-    .header .logo span { color: var(--accent2); }
+    .header .logo {
+      font-size: 1.2rem;
+      font-weight: 700;
+      white-space: nowrap;
+      letter-spacing: -0.5px;
+    }
+    .header .logo span {
+      color: var(--accent2);
+    }
     .status-dot {
-      width: 10px; height: 10px; border-radius: 50%; background: var(--success);
-      flex-shrink: 0; animation: pulse-dot 1.8s infinite;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      flex-shrink: 0;
+      animation: pulse-dot 1.8s infinite;
     }
     @keyframes pulse-dot {
-      0%,100% { box-shadow: 0 0 0 0 rgba(46,204,113,0.7); }
-      50% { box-shadow: 0 0 0 10px rgba(46,204,113,0); }
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7);
+      }
+      50% {
+        box-shadow: 0 0 0 8px rgba(46, 204, 113, 0);
+      }
     }
     .status-text {
-      font-size: 0.7rem; color: var(--success); font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;
+      font-size: 0.65rem;
+      color: var(--success);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
     }
-    .spacer { flex:1; }
+    .spacer {
+      flex: 1;
+    }
 
     .btn {
-      padding: 8px 14px; border-radius: 22px; border: none; cursor: pointer;
-      font-weight: 600; font-size: 0.8rem; letter-spacing: 0.3px;
-      transition: all 0.25s; white-space: nowrap; font-family: inherit;
-      display: inline-flex; align-items: center; gap: 4px;
-      min-height: var(--touch-target); background: transparent;
+      padding: 6px 14px;
+      border-radius: 22px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.75rem;
+      letter-spacing: 0.3px;
+      transition: all 0.25s;
+      white-space: nowrap;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: var(--touch-target);
+      background: transparent;
     }
-    .btn-start { background: var(--success); color: #000; }
-    .btn-stop  { background: var(--danger); color: #fff; }
-    .btn:active { transform: scale(0.96); }
-    .btn-outline { border: 2px solid var(--border); color: var(--text); background: transparent; }
-    .btn-outline:active { border-color: var(--accent2); color: var(--accent2); }
-    .btn-sm { padding: 6px 10px; font-size: 0.7rem; }
-    .btn-danger { border-color: var(--danger); color: var(--danger); }
-    .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-start {
+      background: var(--success);
+      color: #000;
+    }
+    .btn-stop {
+      background: var(--danger);
+      color: #fff;
+    }
+    .btn:active {
+      transform: scale(0.95);
+    }
+    .btn-outline {
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      background: transparent;
+    }
+    .btn-outline:active {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 0.65rem;
+      min-height: 30px;
+    }
 
-    .main-container { display: flex; flex:1; overflow: hidden; position: relative; }
+    /* ===== MAIN ===== */
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
 
+    /* ===== SIDEBAR ===== */
     .sidebar {
-      width: var(--sidebar-w); background: var(--panel);
+      width: var(--sidebar-w);
+      background: var(--panel);
+      backdrop-filter: blur(16px);
       border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; overflow-y: auto;
-      z-index: 500; flex-shrink: 0;
-      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
-      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      z-index: 500;
+      flex-shrink: 0;
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      height: 100%;
     }
     .sidebar.hidden {
       transform: translateX(-100%);
-      position: absolute; height: 100%; top:0; left:0;
+      position: absolute;
+      height: 100%;
+      top: 0;
+      left: 0;
       box-shadow: var(--shadow);
     }
-    .sidebar-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: rgba(22, 33, 62, 0.6);
+    }
+    .sidebar-header h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--accent2);
+    }
+    .sidebar-header button {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 1.6rem;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+
+    /* Sidebar scrollable content */
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .sidebar-content::-webkit-scrollbar {
+      width: 3px;
+    }
+    .sidebar-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .sidebar-content::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 10px;
+    }
+
+    .sidebar-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-section:last-child {
+      border-bottom: none;
+    }
     .sidebar-section h3 {
-      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.2px;
-      color: var(--text-secondary); margin-bottom: 8px; font-weight: 700;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      font-weight: 700;
     }
-    .my-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    .my-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
     .stat-card {
-      background: var(--card); border-radius: var(--radius);
-      padding: 10px 12px; text-align: center;
-      border: 1px solid transparent; transition: border-color 0.3s;
+      background: var(--card);
+      backdrop-filter: blur(4px);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      text-align: center;
+      border: 1px solid transparent;
+      transition: border-color 0.3s;
     }
-    .stat-card:active { border-color: var(--accent2); }
-    .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--accent2); }
-    .stat-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 2px; }
-    .team-list { display: flex; flex-direction: column; gap: 6px; }
+    .stat-card:active {
+      border-color: var(--accent2);
+    }
+    .stat-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent2);
+      line-height: 1.2;
+    }
+    .stat-label {
+      font-size: 0.55rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .team-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
     .member-card {
-      display: flex; align-items: center; gap: 10px;
-      background: var(--card); border-radius: var(--radius);
-      padding: 10px 12px; cursor: pointer; transition: all 0.25s;
-      border: 2px solid transparent; min-height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card);
+      backdrop-filter: blur(4px);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: all 0.25s;
+      border: 1.5px solid transparent;
+      min-height: 48px;
     }
-    .member-card:active { background: #1a3a6e; }
-    .member-card.you { border-color: var(--accent2); box-shadow: 0 0 15px rgba(0,210,255,0.2); }
-    .member-card.offline { opacity: 0.5; }
+    .member-card:active {
+      background: rgba(26, 58, 110, 0.6);
+    }
+    .member-card.you {
+      border-color: var(--accent2);
+      box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+    }
+    .member-card.offline {
+      opacity: 0.5;
+    }
     .member-dot {
-      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.3rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
-    .member-info { flex:1; min-width:0; }
-    .member-name { font-weight: 700; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .member-details { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 8px; }
-    .member-status { font-size: 0.6rem; padding: 3px 7px; border-radius: 10px; font-weight: 600; }
-    .status-active { background: rgba(46,204,113,0.2); color: var(--success); }
-    .status-inactive { background: rgba(243,156,12,0.2); color: var(--warning); }
-    .badge-you { background: var(--accent2); color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
-    .badge-leader { background: #ffd93d; color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 8px; font-weight: 700; margin-left: 4px; }
-
-    .map-container { flex:1; position: relative; z-index: 100; }
-    #map { width:100%; height:100%; background:#1a2a3a; }
-
-    .maplibregl-ctrl-group { background: var(--panel) !important; border: 1px solid var(--border) !important; }
-    .maplibregl-ctrl button { background: var(--panel) !important; color: var(--text) !important; }
-    .maplibregl-ctrl button:hover { background: var(--card) !important; }
-    .maplibregl-ctrl button svg { fill: var(--text) !important; }
-
-    .map-btn {
-      position: absolute; z-index: 600; width: var(--touch-target);
-      height: var(--touch-target); border-radius: 50%;
-      background: var(--panel); border: 1px solid var(--border);
-      color: var(--text); font-size: 1.3rem; display: flex;
-      align-items: center; justify-content: center;
-      cursor: pointer; box-shadow: var(--shadow);
-      transition: all 0.25s; backdrop-filter: blur(10px);
+    .member-info {
+      flex: 1;
+      min-width: 0;
     }
-    .map-btn:active { border-color: var(--accent2); color: var(--accent2); transform: scale(0.95); }
-    .toggle-sidebar { top: 10px; left: 10px; }
-    .follow-btn { bottom: 100px; right: 14px; }
-    .locate-btn { bottom: 44px; right: 14px; }
-    .north-btn { bottom: 156px; right: 14px; }
-
-    .floating-panel {
-      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 600; background: var(--panel); border-radius: 28px;
-      padding: 8px 18px; display: flex; gap: 16px; align-items: center;
-      box-shadow: var(--shadow); border: 1px solid var(--border);
-      backdrop-filter: blur(10px);
+    .member-name {
+      font-weight: 700;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .floating-panel .mini-stat { text-align: center; }
-    .floating-panel .mini-val { font-weight: 700; font-size: 0.95rem; color: var(--accent2); }
-    .floating-panel .mini-lbl { font-size: 0.55rem; color: var(--text-secondary); text-transform: uppercase; }
-
-    .toast {
-      position: fixed; top: 65px; right: 15px; z-index: 9999;
-      background: var(--card); border: 1px solid var(--accent2);
-      border-radius: var(--radius); padding: 10px 16px;
-      color: var(--text); font-weight: 600; font-size: 0.8rem;
-      animation: slideIn 0.4s ease, slideOut 0.4s ease 2.8s forwards;
-      box-shadow: var(--shadow); max-width: 280px;
+    .member-details {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      display: flex;
+      gap: 8px;
     }
-    .toast.error { border-color: var(--danger); background: #4a1a1a; }
-    @keyframes slideIn { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
-    @keyframes slideOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(120%); opacity:0; } }
-
-    .modal-overlay {
-      position: fixed; top:0; left:0; width:100%; height:100%;
-      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 9999;
+    .member-status {
+      font-size: 0.5rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
     }
-    .modal-box {
-      background: var(--panel); border-radius: var(--radius);
-      padding: 28px 24px; max-width: 400px; width: 90%;
-      border: 1px solid var(--border); box-shadow: var(--shadow);
+    .status-active {
+      background: rgba(46, 204, 113, 0.2);
+      color: var(--success);
     }
-    .modal-box h2 { color: var(--accent2); margin-bottom: 16px; text-align: center; }
-    .modal-box input {
-      width: 100%; padding: 12px; margin: 8px 0; border-radius: 20px;
-      background: var(--card); border: 1px solid var(--border); color: var(--text);
-      font-size: 1rem; outline: none; text-align: center;
+    .status-inactive {
+      background: rgba(243, 156, 18, 0.2);
+      color: var(--warning);
     }
-    .modal-box input:focus { border-color: var(--accent2); }
-    .modal-box .btn-group { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-    .modal-box .btn-group .btn { flex:1; justify-content: center; }
-
-    @media (max-width: 768px) {
-      :root { --header-h: 48px; --sidebar-w: 280px; }
-      .header { padding: 0 8px; gap: 6px; }
-      .header .logo { font-size: 1.1rem; }
-      .btn { padding: 7px 11px; font-size: 0.72rem; min-height: 38px; }
-      .sidebar { position: absolute; top:0; left:0; height:100%; width: var(--sidebar-w); }
-      .sidebar:not(.hidden) { transform: translateX(0); }
-      .sidebar.hidden { transform: translateX(-100%); }
-      .toggle-sidebar { top: 8px; left: 8px; width: 40px; height: 40px; }
-      .floating-panel { bottom: 10px; padding: 6px 14px; gap: 12px; border-radius: 24px; }
-      .map-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+    .badge-you {
+      background: var(--accent2);
+      color: #000;
+      font-size: 0.5rem;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-weight: 700;
     }
-    @media (max-width: 480px) {
-      :root { --header-h: 44px; --sidebar-w: 260px; }
-      .header .logo { font-size: 1rem; }
-      .stat-card { padding: 8px 10px; }
-      .stat-value { font-size: 1.2rem; }
-      .member-card { padding: 8px 10px; gap: 8px; }
-      .member-dot { width: 32px; height: 32px; font-size: 1.1rem; }
-      .modal-box { padding: 20px 16px; }
+    .badge-leader {
+      background: #ffd93d;
+      color: #000;
+      font-size: 0.5rem;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-weight: 700;
+      margin-left: 4px;
     }
 
-    .admin-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-    .admin-section .admin-title { color: var(--warning); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-    .admin-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 12px; font-size: 0.65rem; cursor: pointer; }
-    .admin-btn:hover { background: var(--danger); color: #fff; }
-    
+    .admin-section {
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+    .admin-section .admin-title {
+      color: var(--warning);
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .admin-btn {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.55rem;
+      cursor: pointer;
+    }
+    .admin-btn:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
     #statusSelect {
       background: var(--card);
       border: 1px solid var(--border);
       color: var(--text);
       padding: 6px 10px;
       border-radius: 20px;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       outline: none;
       font-family: inherit;
       width: 100%;
     }
-    #statusSelect option { background: var(--panel); }
-    
-    .route-controls { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
-    .route-controls label { font-size: 0.7rem; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+    #statusSelect option {
+      background: var(--panel);
+    }
+
+    .route-controls {
+      margin-top: 6px;
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+    }
+    .route-controls label {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 3px;
+    }
     #gpxFileInput {
-      width: 100%; padding: 4px; background: var(--card); border: 1px solid var(--border);
-      border-radius: 12px; color: var(--text); font-size: 0.7rem;
+      width: 100%;
+      padding: 3px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 0.6rem;
     }
     #routeSelector {
-      width: 100%; background: var(--card); border: 1px solid var(--border);
-      color: var(--text); padding: 6px 10px; border-radius: 20px;
-      font-size: 0.75rem; outline: none; font-family: inherit;
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 4px 8px;
+      border-radius: 16px;
+      font-size: 0.65rem;
+      outline: none;
+      font-family: inherit;
     }
-    .delete-route-btn { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 2px 8px; border-radius: 10px; font-size: 0.6rem; cursor: pointer; }
-    .delete-route-btn:hover { background: var(--danger); color: #fff; }
+    .delete-route-btn {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 0.5rem;
+      cursor: pointer;
+    }
+    .delete-route-btn:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+    .route-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .route-list-item span {
+      font-size: 0.7rem;
+    }
+
+    /* Name input */
+    #myNameInput {
+      flex: 2;
+      min-width: 100px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      outline: none;
+      font-family: inherit;
+    }
+    #myNameInput:focus {
+      border-color: var(--accent2);
+    }
+
+    /* ===== MAP CONTAINER ===== */
+    .map-container {
+      flex: 1;
+      position: relative;
+      z-index: 100;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #0a0a14;
+    }
+
+    .maplibregl-ctrl-group {
+      background: var(--panel) !important;
+      border: 1px solid var(--border) !important;
+      backdrop-filter: blur(8px) !important;
+    }
+    .maplibregl-ctrl button {
+      background: var(--panel) !important;
+      color: var(--text) !important;
+    }
+    .maplibregl-ctrl button:hover {
+      background: var(--card) !important;
+    }
+    .maplibregl-ctrl button svg {
+      fill: var(--text) !important;
+    }
+
+    /* ===== MAP OVERLAY BUTTONS ===== */
+    .map-btn {
+      position: absolute;
+      z-index: 600;
+      width: var(--touch-target);
+      height: var(--touch-target);
+      border-radius: 50%;
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      transition: all 0.25s;
+    }
+    .map-btn:active {
+      border-color: var(--accent2);
+      color: var(--accent2);
+      transform: scale(0.92);
+    }
+    .toggle-sidebar {
+      top: 12px;
+      left: 12px;
+    }
+    .follow-btn {
+      bottom: 110px;
+      right: 14px;
+    }
+    .locate-btn {
+      bottom: 52px;
+      right: 14px;
+    }
+    .north-btn {
+      bottom: 168px;
+      right: 14px;
+    }
+
+    /* ===== TOP STATS OVERLAY ===== */
+    #stats-overlay {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 18px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      box-shadow: var(--shadow);
+      min-width: 200px;
+      justify-content: center;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #stats-overlay .stat-item {
+      text-align: center;
+      pointer-events: none;
+    }
+    #stats-overlay .stat-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent2);
+      line-height: 1.2;
+    }
+    #stats-overlay .stat-label {
+      font-size: 0.5rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    #stats-overlay .divider {
+      width: 1px;
+      height: 28px;
+      background: var(--border);
+    }
+
+    /* ===== BOTTOM START/STOP BUTTON ===== */
+    #controls-overlay {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      pointer-events: none;
+    }
+    #controls-overlay .btn {
+      pointer-events: auto;
+      font-size: 1rem;
+      padding: 12px 32px;
+      border-radius: 30px;
+      min-height: 52px;
+      min-width: 120px;
+      justify-content: center;
+      box-shadow: var(--shadow);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    #controls-overlay .btn-start {
+      background: var(--success);
+      color: #000;
+    }
+    #controls-overlay .btn-start:hover {
+      transform: scale(1.03);
+    }
+    #controls-overlay .btn-stop {
+      background: var(--danger);
+      color: #fff;
+    }
+    #controls-overlay .btn-stop:hover {
+      transform: scale(1.03);
+    }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed;
+      top: 60px;
+      right: 16px;
+      z-index: 9999;
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--accent2);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.75rem;
+      animation: slideIn 0.35s ease, slideOut 0.35s ease 2.8s forwards;
+      box-shadow: var(--shadow);
+      max-width: 280px;
+    }
+    .toast.error {
+      border-color: var(--danger);
+      background: rgba(74, 26, 26, 0.9);
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(120%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(120%);
+        opacity: 0;
+      }
+    }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .modal-box {
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      max-width: 400px;
+      width: 90%;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .modal-box h2 {
+      color: var(--accent2);
+      margin-bottom: 12px;
+      text-align: center;
+      font-size: 1.4rem;
+    }
+    .modal-box p {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+    }
+    .modal-box .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .modal-box .btn-group .btn {
+      width: 100%;
+      justify-content: center;
+      padding: 10px;
+      font-size: 0.9rem;
+      border-radius: 24px;
+    }
+    .modal-box .btn-group .btn-start {
+      background: var(--accent2);
+      color: #000;
+    }
+    .modal-box .btn-group .btn-start:hover {
+      background: #33ddff;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      :root {
+        --header-h: 44px;
+        --sidebar-w: 280px;
+      }
+      .header .logo {
+        font-size: 1rem;
+      }
+      .btn {
+        padding: 4px 10px;
+        font-size: 0.65rem;
+        min-height: 34px;
+      }
+      .sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: var(--sidebar-w);
+      }
+      .sidebar:not(.hidden) {
+        transform: translateX(0);
+      }
+      .sidebar.hidden {
+        transform: translateX(-100%);
+      }
+      .toggle-sidebar {
+        top: 8px;
+        left: 8px;
+        width: 38px;
+        height: 38px;
+        font-size: 1rem;
+      }
+      .map-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 1rem;
+      }
+      .follow-btn {
+        bottom: 95px;
+        right: 10px;
+      }
+      .locate-btn {
+        bottom: 45px;
+        right: 10px;
+      }
+      .north-btn {
+        bottom: 145px;
+        right: 10px;
+      }
+      #stats-overlay {
+        top: 8px;
+        padding: 6px 14px;
+        gap: 12px;
+        min-width: 160px;
+        border-radius: 12px;
+      }
+      #stats-overlay .stat-value {
+        font-size: 0.9rem;
+      }
+      #stats-overlay .stat-label {
+        font-size: 0.45rem;
+      }
+      #controls-overlay {
+        bottom: 16px;
+      }
+      #controls-overlay .btn {
+        font-size: 0.85rem;
+        padding: 10px 24px;
+        min-height: 44px;
+        min-width: 100px;
+      }
+      .modal-box {
+        padding: 20px 16px;
+      }
+      .modal-box h2 {
+        font-size: 1.2rem;
+      }
+      .sidebar-header h3 {
+        font-size: 0.8rem;
+      }
+      .stat-value {
+        font-size: 1rem;
+      }
+      .member-name {
+        font-size: 0.75rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      :root {
+        --header-h: 40px;
+        --sidebar-w: 260px;
+      }
+      #stats-overlay {
+        gap: 8px;
+        padding: 4px 10px;
+        min-width: 120px;
+      }
+      #stats-overlay .stat-value {
+        font-size: 0.75rem;
+      }
+      #stats-overlay .divider {
+        height: 20px;
+      }
+      #controls-overlay .btn {
+        font-size: 0.75rem;
+        padding: 8px 18px;
+        min-height: 40px;
+        min-width: 80px;
+      }
+      .member-card {
+        padding: 6px 10px;
+        min-height: 40px;
+      }
+      .member-dot {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9rem;
+      }
+      .member-name {
+        font-size: 0.7rem;
+      }
+    }
+
+    .custom-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      font-size: 1.6rem;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+      transition: transform 0.15s;
+      cursor: pointer;
+      background: var(--panel);
+      border: 2px solid transparent;
+    }
+    .custom-marker.you-marker {
+      animation: bounce-marker 0.6s ease infinite alternate;
+      font-size: 2rem;
+      width: 50px;
+      height: 50px;
+      border-color: var(--accent2);
+      box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
+    }
+    @keyframes bounce-marker {
+      from {
+        transform: translateY(0);
+      }
+      to {
+        transform: translateY(-5px);
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- ===== HEADER ===== -->
   <header class="header">
-    <span style="font-size:1.4rem;">🚴</span>
+    <span style="font-size:1.2rem;">🚴</span>
     <span class="logo">Bike<span>Team</span></span>
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <button class="btn btn-start" id="btnStart">▶ Start</button>
-    <button class="btn btn-stop" id="btnStop" style="display:none;">⏹ Stop</button>
+    <button class="btn btn-outline btn-sm" id="btnEnableCompass" style="border-color: var(--accent2);">🧭 Compass</button>
   </header>
 
+  <!-- ===== MAIN ===== -->
   <div class="main-container">
+
+    <!-- ===== SIDEBAR ===== -->
     <aside class="sidebar hidden" id="sidebar">
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
-        <h3 style="margin:0; font-size:1rem; color:var(--accent2);" id="sidebarTitle">👥 Team Panel</h3>
-        <button id="closeSidebarBtn" style="background:none; border:none; color:var(--text); font-size:1.8rem; cursor:pointer; padding:0 8px; line-height:1;">✕</button>
+      <div class="sidebar-header">
+        <h3 id="sidebarTitle">👥 Team</h3>
+        <button id="closeSidebarBtn">✕</button>
       </div>
-      <div class="sidebar-section">
-        <h3>📊 My Ride</h3>
-        <div class="my-stats">
-          <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
-          <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
-          <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
-          <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
+      <div class="sidebar-content">
+        <!-- My Stats -->
+        <div class="sidebar-section">
+          <h3>📊 My Ride</h3>
+          <div class="my-stats">
+            <div class="stat-card"><div class="stat-value" id="mySpeed">0.0</div><div class="stat-label">km/h</div></div>
+            <div class="stat-card"><div class="stat-value" id="myDistance">0.00</div><div class="stat-label">km</div></div>
+            <div class="stat-card"><div class="stat-value" id="myElapsed">00:00</div><div class="stat-label">time</div></div>
+            <div class="stat-card"><div class="stat-value" id="myAltitude">--</div><div class="stat-label">m</div></div>
+          </div>
+          <div style="margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="myNameInput" placeholder="Your name" maxlength="20">
+            <select id="statusSelect" style="flex:1; min-width:80px;">
+              <option value="🟢 All Good">🟢 All Good</option>
+              <option value="⚠️ Flat Tire">⚠️ Flat Tire</option>
+              <option value="⚠️ Chain Break">⚠️ Chain Break</option>
+              <option value="⚠️ Mechanical Issue">⚠️ Mechanical Issue</option>
+              <option value="🆘 Need Help">🆘 Need Help</option>
+            </select>
+          </div>
         </div>
-        <div style="margin-top:10px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
-            style="flex:2; min-width:120px; background:var(--card); border:1px solid var(--border); color:var(--text);
-                   padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
-          <select id="statusSelect" style="flex:1; min-width:100px;">
-            <option value="🟢 All Good">🟢 All Good</option>
-            <option value="⚠️ Flat Tire">⚠️ Flat Tire</option>
-            <option value="⚠️ Chain Break">⚠️ Chain Break</option>
-            <option value="⚠️ Mechanical Issue">⚠️ Mechanical Issue</option>
-            <option value="🆘 Need Help">🆘 Need Help</option>
-          </select>
+
+        <!-- Team List -->
+        <div class="sidebar-section" style="flex:1; border-bottom: none;">
+          <h3>👥 Riders (<span id="teamCount">0</span>)</h3>
+          <div class="team-list" id="teamList"></div>
+          <div id="adminPanel" style="display:none;" class="admin-section"></div>
         </div>
-        <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
-          📍 Set manual location
-        </button>
-        <button class="btn btn-outline btn-sm" id="btnEnableCompass" style="margin-top:4px; width:100%; border-color: var(--accent2);">
-          🧭 Enable Compass
-        </button>
-      </div>
-      <div class="sidebar-section" style="flex:1; overflow-y:auto;">
-        <h3>👥 Riders (<span id="teamCount">0</span>)</h3>
-        <div class="team-list" id="teamList"></div>
-        <div id="adminPanel" style="display:none;" class="admin-section"></div>
       </div>
     </aside>
 
+    <!-- ===== MAP ===== -->
     <div class="map-container">
+      <!-- Map Buttons -->
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
       <button class="map-btn north-btn" id="northBtn" title="Reset to North">🧭</button>
       <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
       <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
-      
+
+      <!-- Map -->
       <div id="map"></div>
-      <div class="floating-panel" id="floatingPanel">
-        <div class="mini-stat"><div class="mini-val" id="miniSpeed">0.0</div><div class="mini-lbl">km/h</div></div>
-        <div class="mini-stat"><div class="mini-val" id="miniDist">0.00</div><div class="mini-lbl">km</div></div>
-        <div class="mini-stat"><div class="mini-val" id="miniTime">00:00</div><div class="mini-lbl">time</div></div>
+
+      <!-- ===== TOP STATS OVERLAY ===== -->
+      <div id="stats-overlay">
+        <div class="stat-item">
+          <div class="stat-value" id="miniSpeed">0.0</div>
+          <div class="stat-label">km/h</div>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item">
+          <div class="stat-value" id="miniDist">0.00</div>
+          <div class="stat-label">km</div>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item">
+          <div class="stat-value" id="miniTime">00:00</div>
+          <div class="stat-label">time</div>
+        </div>
+      </div>
+
+      <!-- ===== BOTTOM START/STOP OVERLAY ===== -->
+      <div id="controls-overlay">
+        <button class="btn btn-start" id="btnStart">▶ Start</button>
+        <button class="btn btn-stop" id="btnStop" style="display:none;">⏹ Stop</button>
       </div>
     </div>
   </div>
+
   <div id="toastContainer"></div>
 
   <script>
@@ -354,11 +994,11 @@
       const database = firebase.database();
 
       // ============================================================
-      // USER ID (persistent)
+      // USER ID
       // ============================================================
       let myUserId = localStorage.getItem('biketeam_userid');
       if (!myUserId) {
-        myUserId = 'user_' + Math.random().toString(36).substring(2,10);
+        myUserId = 'user_' + Math.random().toString(36).substring(2, 10);
         localStorage.setItem('biketeam_userid', myUserId);
       }
       console.log(`🆔 User ID: ${myUserId}`);
@@ -369,7 +1009,9 @@
       const UPDATE_INTERVAL_MS = 1500;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
-      const USER_COLORS = ['#00d2ff','#ff6b6b','#ffd93d','#6bcb77','#ff922b','#845ef7','#f06595','#20c997','#ff6b9d','#4ecdc4','#ffe66d','#a29bfe'];
+      const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
+        '#4ecdc4', '#ffe66d', '#a29bfe'
+      ];
 
       let myName = localStorage.getItem('biketeam_myname') || 'Me';
       let myStatus = localStorage.getItem('biketeam_mystatus') || '🟢 All Good';
@@ -393,7 +1035,6 @@
       let mapInitialized = false;
       let followMode = true;
 
-      // MapLibre source/layer names for my marker & trail
       const MY_MARKER_SOURCE = 'my-marker-source';
       const MY_MARKER_LAYER = 'my-marker-layer';
       const MY_TRAIL_SOURCE = 'my-trail-source';
@@ -418,10 +1059,10 @@
       const $btnStop = document.getElementById('btnStop');
       const $myNameInput = document.getElementById('myNameInput');
       const $statusSelect = document.getElementById('statusSelect');
-      const $btnManualLocation = document.getElementById('btnManualLocation');
       const $followBtn = document.getElementById('followBtn');
       const $locateBtn = document.getElementById('locateBtn');
       const $northBtn = document.getElementById('northBtn');
+      const $compassBtn = document.getElementById('btnEnableCompass');
 
       const $mySpeed = document.getElementById('mySpeed');
       const $myDistance = document.getElementById('myDistance');
@@ -432,7 +1073,7 @@
       const $miniTime = document.getElementById('miniTime');
 
       // ============================================================
-      // MODAL / TEAM CREATION & JOIN
+      // MODAL
       // ============================================================
       function showModal() {
         return new Promise((resolve) => {
@@ -441,14 +1082,12 @@
           overlay.id = 'teamModal';
           overlay.innerHTML = `
             <div class="modal-box">
-              <h2>🚴 Join or Create Team</h2>
-              <p style="text-align:center; color:var(--text-secondary); margin-bottom:12px; font-size:0.9rem;">
-                Choose how you want to ride:
-              </p>
-              <div style="display:flex; flex-direction:column; gap:8px;">
-                <button id="modalOpenWorldBtn" class="btn btn-start" style="width:100%; background: var(--accent2);">🌍 Open World</button>
-                <button id="modalCreateBtn" class="btn btn-outline" style="width:100%;">✨ Create Private Team</button>
-                <button id="modalJoinBtn" class="btn btn-outline" style="width:100%;">🔑 Join Private Team</button>
+              <h2>🚴 BikeTeam</h2>
+              <p>Choose how you want to ride.</p>
+              <div class="btn-group">
+                <button id="modalOpenWorldBtn" class="btn btn-start" style="background:var(--accent2);">🌍 Open World</button>
+                <button id="modalCreateBtn" class="btn btn-outline">✨ Create Private Team</button>
+                <button id="modalJoinBtn" class="btn btn-outline">🔑 Join Private Team</button>
               </div>
             </div>
           `;
@@ -488,7 +1127,7 @@
         }
         if (!code) { showToast('Could not generate a unique code. Please try again.', true); return false; }
 
-        const teamCodeRaw = 'team_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,6);
+        const teamCodeRaw = 'team_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
         const teamCodeClean = teamCodeRaw.toLowerCase().replace(/[^a-z0-9_]/g, '');
         const leaderId = myUserId;
         const leaderName = myName;
@@ -548,13 +1187,12 @@
         return true;
       }
 
-      // 🌍 NEW: Open World Mode
       function joinOpenWorld() {
         teamCode = 'openworld';
         isLeader = false;
         localStorage.setItem('biketeam_teamcode', teamCode);
         localStorage.removeItem('biketeam_isLeader');
-        showToast('🌍 Welcome to Open World! You see everyone who is here.');
+        showToast('🌍 Welcome to Open World!');
         startAppWithTeam();
       }
 
@@ -568,8 +1206,7 @@
         appStarted = true;
 
         console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
-        
-        // Update sidebar title based on mode
+
         if (teamCode === 'openworld') {
           $sidebarTitle.textContent = '🌍 Open World';
         } else {
@@ -577,7 +1214,7 @@
         }
 
         initMap();
-        initOrientation(); 
+        initOrientation();
         $myNameInput.value = myName;
         $statusSelect.value = myStatus;
 
@@ -708,7 +1345,6 @@
           updateTeamList();
         });
 
-        // Only set up route listeners for non-openworld (private teams)
         if (teamCode !== 'openworld') {
           const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
           savedRoutesRef.on('value', (snapshot) => {
@@ -719,12 +1355,11 @@
           const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
           activeRouteRef.on('value', (snapshot) => {
             const activeId = snapshot.val();
-            // Remove old route layer if any
             if (routeLayerId && map) {
               try {
                 if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
                 if (map.getSource(routeLayerId)) map.removeSource(routeLayerId);
-              } catch(e) {}
+              } catch (e) {}
               routeLayerId = null;
             }
             if (activeId) {
@@ -803,7 +1438,7 @@
       }
 
       // ============================================================
-      // LEADER ACTIONS (only for private teams)
+      // LEADER ACTIONS
       // ============================================================
       function kickUser(userId, userName) {
         if (!isLeader || teamCode === 'openworld') return;
@@ -853,13 +1488,10 @@
         return points;
       }
 
-      // ============================================================
-      // ROUTE UPLOAD (with 5-route limit) - Leaders only
-      // ============================================================
       function uploadRoute(file) {
         if (!file) { showToast('Please select a GPX file.', true); return; }
         if (teamCode === 'openworld') { showToast('Routes are not available in Open World.', true); return; }
-        
+
         const reader = new FileReader();
         reader.onload = function(e) {
           const gpxText = e.target.result;
@@ -951,7 +1583,7 @@
       }
 
       // ============================================================
-      // MAP LIBRE INIT (Controls moved to top-right)
+      // MAP
       // ============================================================
       function initMap() {
         map = new maplibregl.Map({
@@ -966,9 +1598,9 @@
         map.on('load', function() {
           mapInitialized = true;
           console.log('🗺️ Map loaded');
-          
+
           map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
-          
+
           const geolocateControl = new maplibregl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true },
             trackUserLocation: true,
@@ -991,13 +1623,9 @@
             }
           });
 
-          // My Marker (Symbol Layer)
           map.addSource(MY_MARKER_SOURCE, {
             type: 'geojson',
-            data: {
-              type: 'FeatureCollection',
-              features: []
-            }
+            data: { type: 'FeatureCollection', features: [] }
           });
           map.addLayer({
             id: MY_MARKER_LAYER,
@@ -1016,16 +1644,9 @@
             }
           });
 
-          // My Trail
           map.addSource(MY_TRAIL_SOURCE, {
             type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'LineString',
-                coordinates: []
-              }
-            }
+            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
           });
           map.addLayer({
             id: MY_TRAIL_LAYER,
@@ -1057,49 +1678,33 @@
       }
 
       // ============================================================
-      // MY MARKER (Symbol Layer)
+      // MARKERS
       // ============================================================
       function updateMyMarker() {
         if (!myLastPosition || !map || !mapInitialized) return;
         const { lat, lng } = myLastPosition;
-
         if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) {
           console.warn('⚠️ Invalid coordinates, skipping marker update:', { lat, lng });
           return;
         }
-
-        console.log(`📍 Updating my marker to: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-
         const source = map.getSource(MY_MARKER_SOURCE);
         if (source) {
           source.setData({
             type: 'FeatureCollection',
             features: [{
               type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [lng, lat]
-              },
-              properties: {
-                name: myName,
-                speed: myCurrentSpeed,
-                status: myStatus
-              }
+              geometry: { type: 'Point', coordinates: [lng, lat] },
+              properties: { name: myName, speed: myCurrentSpeed, status: myStatus }
             }]
           });
         }
-
         if (map.getLayer(MY_MARKER_LAYER)) {
           map.setPaintProperty(MY_MARKER_LAYER, 'text-color', myColor);
         }
       }
 
-      // ============================================================
-      // MY TRAIL
-      // ============================================================
       function updateMyTrail() {
         if (myRoutePoints.length < 2 || !map || !mapInitialized) return;
-
         const source = map.getSource(MY_TRAIL_SOURCE);
         if (source) {
           source.setData({
@@ -1112,12 +1717,9 @@
         }
       }
 
-      // ============================================================
-      // REMOTE MARKERS (HTML markers)
-      // ============================================================
-      function createMarkerElement(emoji, color, isYou = false) {
+      function createMarkerElement(emoji, color) {
         const el = document.createElement('div');
-        el.className = 'custom-marker' + (isYou ? ' you-marker' : '');
+        el.className = 'custom-marker';
         el.style.backgroundColor = color || '#888';
         el.textContent = emoji;
         return el;
@@ -1125,28 +1727,24 @@
 
       function updateRemoteMarkers() {
         if (!map || !mapInitialized) return;
-
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
-
           if (remoteMarkers[uid]) {
             remoteMarkers[uid].remove();
             remoteMarkers[uid] = null;
           }
-
           const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
-          const el = createMarkerElement('🚴‍♂️', u.color || '#888', false);
+          const el = createMarkerElement('🚴‍♂️', u.color || '#888');
           el.style.opacity = isOffline ? 0.5 : 1;
-
           const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
             .setLngLat([u.lng, u.lat])
             .addTo(map);
-
           const popup = new maplibregl.Popup({ offset: [0, -15] })
-            .setHTML(`<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
+            .setHTML(
+              `<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
+            );
           marker.setPopup(popup);
-
           remoteMarkers[uid] = marker;
 
           if (u.routePoints && u.routePoints.length >= 2) {
@@ -1155,7 +1753,7 @@
                 const oldId = remoteTrails[uid];
                 if (map.getLayer(oldId)) map.removeLayer(oldId);
                 if (map.getSource(oldId)) map.removeSource(oldId);
-              } catch(e) {}
+              } catch (e) {}
               remoteTrails[uid] = null;
             }
             const geojson = {
@@ -1180,7 +1778,7 @@
                   'line-dasharray': [6, 4]
                 }
               });
-            } catch(e) {}
+            } catch (e) {}
           }
         }
       }
@@ -1198,7 +1796,7 @@
             const id = remoteTrails[uid];
             if (map.getLayer(id)) map.removeLayer(id);
             if (map.getSource(id)) map.removeSource(id);
-          } catch(e) {}
+          } catch (e) {}
           delete remoteTrails[uid];
         }
       }
@@ -1231,7 +1829,7 @@
             myLastPosition = newPos;
 
             updateMyStats();
-            updateMyMarker();      
+            updateMyMarker();
             updateMyTrail();
             broadcastMyPosition();
 
@@ -1280,7 +1878,7 @@
       }
 
       // ============================================================
-      // COMPASS (FIXED INVERSION)
+      // COMPASS
       // ============================================================
       let isOrientationActive = false;
 
@@ -1302,12 +1900,12 @@
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
           if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            console.log('🍎 iOS: Tap "Enable Compass" button to activate.');
-            showToast('🍎 Tap "Enable Compass" button for map rotation.', false);
+            console.log('🍎 iOS: Tap "Compass" button to activate.');
+            showToast('🍎 Tap "Compass" button for map rotation.', false);
           } else {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass active – map rotates with your phone!');
-            console.log('✅ Compass listener attached (Android/legacy).');
+            console.log('✅ Compass listener attached.');
           }
         } else {
           console.warn('❌ Device orientation not supported.');
@@ -1316,15 +1914,14 @@
       }
 
       function enableCompass() {
-        if (typeof DeviceOrientationEvent !== 'undefined' && 
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
           DeviceOrientationEvent.requestPermission()
             .then(response => {
               if (response === 'granted') {
                 window.addEventListener('deviceorientation', handleDeviceOrientation);
                 showToast('✅ Compass activated! Rotate your phone.');
-                const btn = document.getElementById('btnEnableCompass');
-                if (btn) btn.style.display = 'none';
+                $compassBtn.style.display = 'none';
                 console.log('✅ iOS Compass permission granted.');
               } else {
                 showToast('❌ Compass blocked. Please allow in browser settings.', true);
@@ -1338,52 +1935,17 @@
       }
 
       // ============================================================
-      // MANUAL LOCATION
-      // ============================================================
-      function setManualLocation(lat, lng) {
-        stopGeolocation();
-        useManualLocation = true;
-        myLastPosition = { lat, lng, speed: 0, heading: null, altitude: null, timestamp: Date.now() };
-        myCurrentSpeed = 0;
-        myCurrentAltitude = null;
-        updateMyStats();
-        updateMyMarker();
-        broadcastMyPosition();
-        if (map) map.setCenter([lng, lat]);
-        $statusText.textContent = 'MANUAL';
-        $statusText.style.color = 'var(--accent2)';
-        $statusDot.style.background = 'var(--accent2)';
-        $statusDot.style.animation = 'none';
-        showToast(`📍 Location set to ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-      }
-
-      function promptManualLocation() {
-        const lat = prompt('Enter latitude (e.g., 40.7128):', myLastPosition ? myLastPosition.lat.toFixed(5) : '40.7128');
-        if (lat === null) return;
-        const lng = prompt('Enter longitude (e.g., -74.0060):', myLastPosition ? myLastPosition.lng.toFixed(5) : '-74.0060');
-        if (lng === null) return;
-        const latNum = parseFloat(lat), lngNum = parseFloat(lng);
-        if (isNaN(latNum) || isNaN(lngNum)) {
-          alert('Invalid coordinates.');
-          return;
-        }
-        setManualLocation(latNum, lngNum);
-      }
-
-      // ============================================================
       // HELPERS
       // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon /
+        2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       }
 
-      // ============================================================
-      // UI UPDATES
-      // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
         let elapsed = 0;
@@ -1400,14 +1962,17 @@
       }
 
       function formatDuration(sec) {
-        const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
-        return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        const h = Math.floor(sec / 3600),
+          m = Math.floor((sec % 3600) / 60),
+          s = Math.floor(sec % 60);
+        return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` :
+          `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
       }
 
       function estimateRouteDistance(pts) {
         if (!pts || pts.length < 2) return 0;
         let d = 0;
-        for (let i = 1; i < pts.length; i++) d += haversineDistance(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+        for (let i = 1; i < pts.length; i++) d += haversineDistance(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
         return d;
       }
 
@@ -1445,15 +2010,16 @@
         $teamCount.textContent = members.length - 1;
 
         if (members.length <= 1) {
-          $teamList.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders${teamCode === 'openworld' ? ' in Open World' : ` in "${teamCode}"`}...</div>`;
+          $teamList.innerHTML =
+            `<div style="color:var(--text-secondary);font-size:0.75rem;padding:20px;text-align:center;">Waiting for riders${teamCode === 'openworld' ? ' in Open World' : ` in "${teamCode}"`}...</div>`;
         } else {
           $teamList.innerHTML = members.map(m => {
-            const leaderBadge = (m.id === myUserId && isLeader) ? '<span class="badge-leader">👑 LEADER</span>' : '';
+            const leaderBadge = (m.id === myUserId && isLeader) ? '<span class="badge-leader">👑</span>' : '';
             return `
               <div class="member-card${m.isYou ? ' you' : ''}${!m.isActive ? ' offline' : ''}" onclick="window.highlightUser('${m.id}')">
                 <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
                 <div class="member-info">
-                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge} <span style="font-size:0.8rem;">${escapeHtml(m.status)}</span></div>
+                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge} <span style="font-size:0.65rem;">${escapeHtml(m.status)}</span></div>
                   <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
                 </div>
                 <span class="member-status ${m.isActive ? 'status-active' : 'status-inactive'}">${m.isActive ? 'LIVE' : 'AWAY'}</span>
@@ -1465,7 +2031,7 @@
       }
 
       // ============================================================
-      // ROUTE DROPDOWN & LIST (for leader, private teams only)
+      // ROUTES
       // ============================================================
       let activeRouteId = null;
 
@@ -1502,17 +2068,19 @@
         routesRef.once('value').then((snap) => {
           const routes = snap.val();
           if (!routes) {
-            container.innerHTML = '<div style="color:var(--text-secondary); font-size:0.7rem;">No routes saved.</div>';
+            container.innerHTML = '<div style="color:var(--text-secondary); font-size:0.6rem;">No routes saved.</div>';
             return;
           }
           let html = '';
           Object.keys(routes).forEach(id => {
             const route = routes[id];
             const isActive = (id === activeRouteId);
-            html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
-              <span style="font-size:0.8rem;">${escapeHtml(route.name || 'Unnamed')} ${isActive ? '⭐' : ''}</span>
-              <button class="delete-route-btn" data-id="${id}" data-name="${escapeHtml(route.name || 'Unnamed')}">Delete</button>
-            </div>`;
+            html += `
+              <div class="route-list-item">
+                <span>${escapeHtml(route.name || 'Unnamed')} ${isActive ? '⭐' : ''}</span>
+                <button class="delete-route-btn" data-id="${id}" data-name="${escapeHtml(route.name || 'Unnamed')}">Delete</button>
+              </div>
+            `;
           });
           container.innerHTML = html;
 
@@ -1535,7 +2103,7 @@
       }
 
       // ============================================================
-      // ADMIN PANEL (with route management & leave button)
+      // ADMIN PANEL
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -1543,12 +2111,11 @@
           return;
         }
 
-        // Open World: only show "Leave Open World" button
         if (teamCode === 'openworld') {
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
-            <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
-              <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🚪 Leave Open World</button>
+            <div style="border-top:1px solid var(--border);padding-top:10px;">
+              <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🚪 Leave Open World</button>
             </div>
           `;
           document.getElementById('leaveTeamBtn')?.addEventListener('click', leaveTeam);
@@ -1556,9 +2123,8 @@
         }
 
         if (isLeader) {
-          // ---- LEADER VIEW (Private Team) ----
           $adminPanel.style.display = 'block';
-          
+
           let codeDisplay = 'Loading...';
           database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((snap) => {
             let foundCode = '';
@@ -1569,7 +2135,6 @@
             }
           });
 
-          // Fetch active route ID
           database.ref('teams/' + teamCode + '/activeRouteId').on('value', (snap) => {
             activeRouteId = snap.val();
             renderRouteDropdown();
@@ -1577,87 +2142,73 @@
           });
 
           let html = `<div class="admin-title">👑 Team Admin</div>`;
-          html += `<div style="background:var(--card); padding:8px 12px; border-radius:8px; margin-bottom:12px; text-align:center;">
-            <span style="color:var(--text-secondary); font-size:0.7rem;">🔑 Share this code with your team</span><br>
-            <span id="teamCodeDisplay" style="font-size:2rem; font-weight:bold; color:var(--accent2); letter-spacing:6px;">${codeDisplay}</span>
+          html += `<div style="background:var(--card);padding:6px 10px;border-radius:8px;margin-bottom:8px;text-align:center;">
+            <span style="color:var(--text-secondary);font-size:0.55rem;">🔑 Team Code</span><br>
+            <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
-          // Route Management
           html += `<div class="route-controls">
-            <label>📂 Upload GPX Route (max 5)</label>
+            <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
-            <button id="uploadRouteBtn" class="btn btn-outline btn-sm" style="width:100%; margin-top:4px;">⬆️ Upload Route</button>
+            <button id="uploadRouteBtn" class="btn btn-outline btn-sm" style="width:100%;margin-top:3px;">⬆️ Upload</button>
           </div>
           <div class="route-controls">
             <label>🗺️ Active Route</label>
-            <select id="routeSelector">
-              <option value="">-- None --</option>
-            </select>
+            <select id="routeSelector"><option value="">-- None --</option></select>
           </div>
-          <div style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
-            <div style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:4px;">Saved Routes (max 5):</div>
+          <div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">
+            <div style="font-size:0.6rem;color:var(--text-secondary);margin-bottom:3px;">Saved Routes:</div>
             <div id="routeListItems"></div>
           </div>`;
 
-          // Member list with kick buttons
           const members = [];
           for (const uid in remoteUsers) {
             const u = remoteUsers[uid];
             members.push({ id: uid, name: u.userName || 'Rider' });
           }
           if (members.length > 0) {
-            html += `<div style="margin-top:10px; border-top:1px solid var(--border); padding-top:8px;">
-              <div style="margin-bottom:6px; font-size:0.75rem; color:var(--text-secondary);">Kick a member:</div>`;
+            html += `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+              <div style="font-size:0.6rem;color:var(--text-secondary);margin-bottom:3px;">Kick members:</div>`;
             members.forEach(m => {
-              html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
-                <span style="font-size:0.8rem;">${escapeHtml(m.name)}</span>
+              html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:0.7rem;">${escapeHtml(m.name)}</span>
                 <button class="admin-btn" data-uid="${m.id}" data-name="${escapeHtml(m.name)}">Kick</button>
               </div>`;
             });
             html += `</div>`;
-          } else {
-            html += `<div style="color:var(--text-secondary); font-size:0.7rem; margin-top:8px;">No other members.</div>`;
           }
-          html += `<div style="margin-top:10px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🗑️ Delete Entire Team</button></div>`;
+          html += `<div style="margin-top:8px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🗑️ Delete Team</button></div>`;
           $adminPanel.innerHTML = html;
 
-          // --- Attach Leader Events ---
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
-            uploadBtn.onclick = function() {
-              uploadRoute(fileInput.files[0]);
-            };
+            uploadBtn.onclick = function() { uploadRoute(fileInput.files[0]); };
           }
 
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
-              const value = this.value;
-              database.ref('teams/' + teamCode + '/activeRouteId').set(value || null);
+              database.ref('teams/' + teamCode + '/activeRouteId').set(this.value || null);
             };
           }
 
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
             btn.onclick = (e) => {
               e.stopPropagation();
-              const uid = btn.dataset.uid;
-              const name = btn.dataset.name;
-              kickUser(uid, name);
+              kickUser(btn.dataset.uid, btn.dataset.name);
             };
           });
-          const delBtn = document.getElementById('deleteTeamBtn');
-          if (delBtn) delBtn.onclick = deleteTeam;
+          document.getElementById('deleteTeamBtn')?.addEventListener('click', deleteTeam);
 
           renderRouteDropdown();
           renderRouteList();
 
         } else {
-          // ---- REGULAR MEMBER VIEW (Private Team) ----
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
-            <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
-              <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🚪 Leave Team</button>
+            <div style="border-top:1px solid var(--border);padding-top:10px;">
+              <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🚪 Leave Team</button>
             </div>
           `;
           document.getElementById('leaveTeamBtn')?.addEventListener('click', leaveTeam);
@@ -1688,7 +2239,9 @@
         isTracking = true;
         trackStartTime = Date.now();
         myTotalDistance = 0;
-        myRoutePoints = [[myLastPosition.lat, myLastPosition.lng]];
+        myRoutePoints = [
+          [myLastPosition.lat, myLastPosition.lng]
+        ];
         updateMyTrail();
         $btnStart.style.display = 'none';
         $btnStop.style.display = 'inline-flex';
@@ -1733,15 +2286,12 @@
       }
 
       // ============================================================
-      // RIDE SESSION PERSISTENCE
+      // SESSION
       // ============================================================
       const SESSION_KEY = 'biketeam_ridesession';
 
       function saveRideSession() {
-        if (!isTracking) {
-          localStorage.removeItem(SESSION_KEY);
-          return;
-        }
+        if (!isTracking) { localStorage.removeItem(SESSION_KEY); return; }
         try {
           const session = {
             isTracking: true,
@@ -1765,14 +2315,10 @@
             return null;
           }
           return session;
-        } catch (e) {
-          return null;
-        }
+        } catch (e) { return null; }
       }
 
-      function clearRideSession() {
-        localStorage.removeItem(SESSION_KEY);
-      }
+      function clearRideSession() { localStorage.removeItem(SESSION_KEY); }
 
       // ============================================================
       // TEST FIREBASE
@@ -1792,10 +2338,7 @@
       // EVENT LISTENERS
       // ============================================================
 
-      const $compassBtn = document.getElementById('btnEnableCompass');
-      if ($compassBtn) {
-        $compassBtn.addEventListener('click', enableCompass);
-      }
+      $compassBtn.addEventListener('click', enableCompass);
 
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
@@ -1836,7 +2379,6 @@
         }
       });
 
-      $btnManualLocation.addEventListener('click', promptManualLocation);
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
@@ -1873,7 +2415,8 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'f' && document.activeElement === document.body) { $followBtn.click(); }
-        if (e.key === 's' && document.activeElement === document.body) { if (!isTracking) startTracking(); else stopTracking(); }
+        if (e.key === 's' && document.activeElement === document.body) { if (!isTracking) startTracking();
+          else stopTracking(); }
       });
 
       window.addEventListener('resize', () => {
@@ -1888,13 +2431,9 @@
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
-      setInterval(() => {
-        saveRideSession();
-      }, 5000);
+      setInterval(() => { saveRideSession(); }, 5000);
 
-      window.addEventListener('beforeunload', function() {
-        saveRideSession();
-      });
+      window.addEventListener('beforeunload', function() { saveRideSession(); });
 
       // ============================================================
       // INIT
@@ -1902,7 +2441,6 @@
       async function init() {
         let storedTeamCode = localStorage.getItem('biketeam_teamcode');
 
-        // Handle Open World special case
         if (storedTeamCode === 'openworld') {
           teamCode = storedTeamCode;
           isLeader = false;
@@ -1940,13 +2478,8 @@
         }
 
         const choice = await showModal();
-        if (choice === 'create') {
-          await createTeam();
-        } else if (choice === 'join') {
-          await joinTeam();
-        } else if (choice === 'openworld') {
-          joinOpenWorld();
-        }
+        if (choice === 'create') { await createTeam(); } else if (choice === 'join') { await joinTeam(); } else if (choice ===
+          'openworld') { joinOpenWorld(); }
         if (!teamCode) {
           showToast('Selection failed. Please refresh.', true);
           location.reload();
