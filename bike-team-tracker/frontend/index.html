@@ -331,9 +331,11 @@
 
     <div class="map-container">
       <button class="map-btn toggle-sidebar" id="toggleSidebar" aria-label="Toggle team panel">☰</button>
+      <button class="map-btn north-btn" id="northBtn" title="Reset to North" style="bottom: 212px; right: 14px;">🧭</button>
       <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
       <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
       <button class="map-btn manual-btn" id="manualBtn" title="Set manual location">✏️</button>
+      
       <div id="map"></div>
       <div class="floating-panel" id="floatingPanel">
         <div class="mini-stat"><div class="mini-val" id="miniSpeed">0.0</div><div class="mini-lbl">km/h</div></div>
@@ -558,6 +560,7 @@
 
         console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
         initMap();
+         initOrientation(); 
         $myNameInput.value = myName;
         $statusSelect.value = myStatus;
 
@@ -951,35 +954,41 @@
       // 11. MAP & GEOLOCATION
       // ============================================================
       function initMap() {
-        map = L.map('map', {
-          center: [40.7128, -74.006],
-          zoom: 14,
-          zoomControl: false,
-          attributionControl: true
-        });
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/">CARTO</a>',
-  maxZoom: 19
-}).addTo(map);
+  // 🔥 Zoom increased from 14 to 16 (slightly zoomed in)
+  // 🔥 Added rotate: true and bearing: 0
+  map = L.map('map', {
+    center: [40.7128, -74.006],
+    zoom: 16,                 // Slightly zoomed in
+    zoomControl: false,
+    attributionControl: true,
+    rotate: true,             // Allow map rotation
+    bearing: 0                // Start facing North
+  });
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        markerLayerGroup.addTo(map);
-        trailLayerGroup.addTo(map);
-        routeLayerGroup.addTo(map);
+  // Dark map tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19
+  }).addTo(map);
 
-        map.on('dragstart', () => { followMode = false; });
-        map.on('dblclick', () => {
-          followMode = true;
-          if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
-        });
+  markerLayerGroup.addTo(map);
+  trailLayerGroup.addTo(map);
+  routeLayerGroup.addTo(map);
 
-        map.on('click', () => {
-          if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
-            $sidebar.classList.add('hidden');
-            $sidebar.style.transform = 'translateX(-100%)';
-          }
-        });
-      }
+  map.on('dragstart', () => { followMode = false; });
+  map.on('dblclick', () => {
+    followMode = true;
+    if (myLastPosition) map.setView([myLastPosition.lat, myLastPosition.lng], map.getZoom(), { animate: true });
+  });
+
+  map.on('click', () => {
+    if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
+      $sidebar.classList.add('hidden');
+      $sidebar.style.transform = 'translateX(-100%)';
+    }
+  });
+}
 
       function startGeolocation() {
         if (useManualLocation) return false;
@@ -1053,6 +1062,52 @@
           $statusText.style.color = 'var(--warning)';
         }
       }
+
+      // ============================================================
+// 🧭 COMPASS / ORIENTATION (Rotate map based on phone facing)
+// ============================================================
+let isOrientationActive = false;
+
+function updateMapBearing(bearingDeg) {
+  if (map && !isNaN(bearingDeg)) {
+    map.setBearing(bearingDeg);
+  }
+}
+
+function handleDeviceOrientation(event) {
+  const alpha = event.alpha; // 0-360 degrees (compass heading)
+  if (alpha !== null && !isNaN(alpha)) {
+    isOrientationActive = true;
+    updateMapBearing(alpha);
+  }
+}
+
+function initOrientation() {
+  // Check if deviceorientation is available
+  if (typeof DeviceOrientationEvent !== 'undefined') {
+    // iOS 13+ requires explicit permission
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(response => {
+          if (response === 'granted') {
+            window.addEventListener('deviceorientation', handleDeviceOrientation);
+            showToast('🧭 Compass enabled – map rotates with your phone!');
+          } else {
+            showToast('⚠️ Compass permission denied. Map will stay north-up.', true);
+          }
+        })
+        .catch(err => console.warn('Orientation permission error:', err));
+    } else {
+      // Android and older iOS
+      window.addEventListener('deviceorientation', handleDeviceOrientation);
+      showToast('🧭 Compass active – map rotates with your phone!');
+    }
+  } else {
+    console.warn('Device orientation not supported.');
+    // Fallback: Use GPS heading (direction of movement)
+    showToast('⚠️ Compass not available. Using GPS direction (if moving).');
+  }
+}
 
       // ============================================================
       // 12. MANUAL LOCATION
@@ -1528,6 +1583,15 @@
 
       $btnManualLocation.addEventListener('click', promptManualLocation);
       $manualBtn.addEventListener('click', promptManualLocation);
+      const $northBtn = document.getElementById('northBtn');
+if ($northBtn) {
+  $northBtn.addEventListener('click', () => {
+    if (map) {
+      map.setBearing(0);
+      showToast('🧭 Map reset to North');
+    }
+  });
+}
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
