@@ -955,64 +955,61 @@
       // 9. 🗺️ MAPLIBRE MAP INIT (FIXED style)
       // ============================================================
       function initMap() {
-        map = new maplibregl.Map({
-          container: 'map',
-          center: [0, 0],
-          zoom: 14,
-          bearing: 0,
-          pitch: 0,
-          // ✅ FREE, WORKING DARK STYLE (no API key needed)
-          style: 'https://tiles.openfreemap.org/styles/liberty.json'
-        });
+  map = new maplibregl.Map({
+    container: 'map',
+    center: [0, 0],
+    zoom: 14,
+    bearing: 0,
+    pitch: 0,
+    // ✅ NOW USING A RELIABLE FREE DARK STYLE
+    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+  });
 
-        map.on('load', function() {
-          mapInitialized = true;
-          console.log('🗺️ Map loaded');
-          
-          // Add controls
-          map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
-          const geolocateControl = new maplibregl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true },
-            trackUserLocation: true,
-            showUserHeading: true,
-            showAccuracyCircle: true
-          });
-          map.addControl(geolocateControl, 'bottom-right');
+  map.on('load', function() {
+    mapInitialized = true;
+    console.log('🗺️ Map loaded');
+    
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+    const geolocateControl = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserHeading: true,
+      showAccuracyCircle: true
+    });
+    map.addControl(geolocateControl, 'bottom-right');
 
-          // Map events
-          map.on('dragstart', () => { followMode = false; });
-          map.on('dblclick', () => {
-            followMode = true;
-            if (myLastPosition) {
-              map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-            }
-          });
-          map.on('click', () => {
-            if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
-              $sidebar.classList.add('hidden');
-              $sidebar.style.transform = 'translateX(-100%)';
-            }
-          });
-
-          // Re-apply markers
-          if (myLastPosition) {
-            updateMyMarker();
-            updateMyTrail();
-          }
-          updateRemoteMarkers();
-          if (myLastPosition && followMode) {
-            map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-          }
-        });
-
-        // Fallback if style fails
-        map.on('error', function() {
-          console.warn('Map style error, using fallback');
-          if (!map.getStyle()) {
-            map.setStyle('https://demotiles.maplibre.org/style.json');
-          }
-        });
+    map.on('dragstart', () => { followMode = false; });
+    map.on('dblclick', () => {
+      followMode = true;
+      if (myLastPosition) {
+        map.setCenter([myLastPosition.lng, myLastPosition.lat]);
       }
+    });
+    map.on('click', () => {
+      if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
+        $sidebar.classList.add('hidden');
+        $sidebar.style.transform = 'translateX(-100%)';
+      }
+    });
+
+    if (myLastPosition) {
+      updateMyMarker();
+      updateMyTrail();
+    }
+    updateRemoteMarkers();
+    if (myLastPosition && followMode) {
+      map.setCenter([myLastPosition.lng, myLastPosition.lat]);
+    }
+  });
+
+  // Fallback if the first style fails
+  map.on('error', function() {
+    console.warn('Map style error, using fallback');
+    if (!map.getStyle()) {
+      map.setStyle('https://demotiles.maplibre.org/style.json');
+    }
+  });
+}
 
       // ============================================================
       // 10. MAPLIBRE MARKER FUNCTIONS
