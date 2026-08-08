@@ -538,6 +538,14 @@
       background: var(--panel);
       border: 2px solid transparent;
     }
+    .custom-marker.you-marker {
+      animation: bounce-marker 0.6s ease infinite alternate;
+      font-size: 2rem;
+      width: 50px;
+      height: 50px;
+      border-color: var(--accent2);
+      box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
+    }
     .custom-marker.cluster-marker {
       width: 60px;
       height: 60px;
@@ -712,6 +720,9 @@
       let routeLayerId = null;
       let activeRouteId = null;
       let startMarker = null; // maplibregl.Marker for the start flag
+
+      // ---- MY OWN MARKER ----
+      let myMarker = null;
 
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
@@ -1342,6 +1353,33 @@
         }
       }
 
+      // ============================================================
+      // 🔥 ADDED: Update my own marker
+      // ============================================================
+      function updateMyMarker() {
+        if (!myLastPosition || !map || !mapInitialized) return;
+        const { lat, lng } = myLastPosition;
+
+        // Remove old marker
+        if (myMarker) {
+          myMarker.remove();
+          myMarker = null;
+        }
+
+        const el = document.createElement('div');
+        el.className = 'custom-marker you-marker';
+        el.style.backgroundColor = myColor;
+        el.textContent = '🚴';
+
+        myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([lng, lat])
+          .addTo(map);
+
+        const popup = new maplibregl.Popup({ offset: [0, -15] })
+          .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
+        myMarker.setPopup(popup);
+      }
+
       // ===== LEADER ACTIONS =====
       function kickUser(userId, userName) {
         if (!isLeader || teamCode === 'openworld') return;
@@ -1481,7 +1519,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: SET START POINT – ALSO MOVES THE BIKE MARKER
+      // 🔥 FIXED: SET START POINT – MOVES THE BIKE MARKER
       // ============================================================
       function setStartPoint() {
         if (!isLeader) {
@@ -1592,6 +1630,7 @@
               updateTeamList();
               broadcastMyPosition();
               renderClusters();
+              updateMyMarker();
               showToast(`✅ Username set to "${myName}"`);
               return true;
             }
@@ -1656,6 +1695,7 @@
 
           if (myLastPosition) {
             renderClusters();
+            updateMyMarker();
             updateMyTrail();
           }
           if (myLastPosition && followMode) {
@@ -1711,6 +1751,7 @@
 
             updateMyStats();
             renderClusters();
+            updateMyMarker();
             updateMyTrail();
             broadcastMyPosition();
 
@@ -2296,6 +2337,7 @@
         broadcastMyPosition();
         updateTeamList();
         renderClusters();
+        updateMyMarker();
       });
 
       $myNameInput.addEventListener('change', function() {
