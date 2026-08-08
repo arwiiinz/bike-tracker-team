@@ -509,17 +509,17 @@
       background: var(--border);
     }
 
-    #controls-overlay {
-      position: absolute;
-      bottom: 80px;   /* ✅ Moved up so it's fully visible */
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 500;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      pointer-events: none;
-    }
+   #controls-overlay {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 20px) + 100px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  pointer-events: none;
+}
     #controls-overlay .btn {
       pointer-events: auto;
       font-size: 1.2rem;
