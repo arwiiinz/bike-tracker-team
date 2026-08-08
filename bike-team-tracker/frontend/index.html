@@ -730,6 +730,9 @@
       // ---- TEAM CLEANUP ----
       let teamCleanupInterval = null;
 
+      // ---- 🔥 FIX: Prevent duplicate team creation ----
+      let isCreatingTeam = false;
+
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
       const $sidebarTitle = document.getElementById('sidebarTitle');
@@ -791,63 +794,74 @@
         });
       }
 
-      // ===== TEAM CREATION =====
+      // ============================================================
+      // 🔥 FIXED: TEAM CREATION WITH DUPLICATE GUARD
+      // ============================================================
       async function createTeam() {
-        const teamName = prompt('👑 Enter a name for your new team (e.g., "Sunday Riders"):', 'My Team');
-        if (!teamName) return false;
-        const trimmed = teamName.trim();
-        if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
-
-        try {
-          const nameSnap = await database.ref('teams')
-            .orderByChild('_meta/teamName')
-            .equalTo(trimmed)
-            .once('value');
-
-          if (nameSnap.exists()) {
-            showToast(`❌ Team name "${trimmed}" is already taken. Please choose another.`, true);
-            return false;
-          }
-        } catch (e) {
-          showToast('⚠️ Could not validate team name. Please try again.', true);
+        // Prevent multiple simultaneous calls
+        if (isCreatingTeam) {
+          showToast('⏳ Already creating a team, please wait...', true);
           return false;
         }
-
-        let code = '';
-        let attempts = 0;
-        while (attempts < 50) {
-          const candidate = String(Math.floor(1000 + Math.random() * 9000));
-          const snap = await database.ref('teamCodes/' + candidate).once('value');
-          if (!snap.exists()) {
-            code = candidate;
-            break;
-          }
-          attempts++;
-        }
-        if (!code) { showToast('Could not generate a unique code. Please try again.', true); return false; }
-
-        const teamCodeRaw = 'team_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
-        const teamCodeClean = teamCodeRaw.toLowerCase().replace(/[^a-z0-9_]/g, '');
-        const leaderId = myUserId;
-        const leaderName = myName;
-
-        const updates = {};
-        updates['teams/' + teamCodeClean + '/_meta'] = {
-          leaderId: leaderId,
-          leaderName: leaderName,
-          teamName: trimmed,
-          createdAt: Date.now(),
-          lastActivity: Date.now()
-        };
-        updates['teamCodes/' + code] = {
-          teamCode: teamCodeClean,
-          leaderId: leaderId,
-          leaderName: leaderName,
-          teamName: trimmed,
-          createdAt: Date.now()
-        };
+        isCreatingTeam = true;
 
         try {
+          const teamName = prompt('👑 Enter a name for your new team (e.g., "Sunday Riders"):', 'My Team');
+          if (!teamName) return false;
+          const trimmed = teamName.trim();
+          if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
+
+          // Check if name already exists
+          try {
+            const nameSnap = await database.ref('teams')
+              .orderByChild('_meta/teamName')
+              .equalTo(trimmed)
+              .once('value');
+
+            if (nameSnap.exists()) {
+              showToast(`❌ Team name "${trimmed}" is already taken. Please choose another.`, true);
+              return false;
+            }
+          } catch (e) {
+            showToast('⚠️ Could not validate team name. Please try again.', true);
+            return false;
+          }
+
+          // Generate unique 4-digit code
+          let code = '';
+          let attempts = 0;
+          while (attempts < 50) {
+            const candidate = String(Math.floor(1000 + Math.random() * 9000));
+            const snap = await database.ref('teamCodes/' + candidate).once('value');
+            if (!snap.exists()) {
+              code = candidate;
+              break;
+            }
+            attempts++;
+          }
+          if (!code) { showToast('Could not generate a unique code. Please try again.', true); return false; }
+
+          const teamCodeRaw = 'team_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
+          const teamCodeClean = teamCodeRaw.toLowerCase().replace(/[^a-z0-9_]/g, '');
+          const leaderId = myUserId;
+          const leaderName = myName;
+
+          const updates = {};
+          updates['teams/' + teamCodeClean + '/_meta'] = {
+            leaderId: leaderId,
+            leaderName: leaderName,
+            teamName: trimmed,
+            createdAt: Date.now(),
+            lastActivity: Date.now()
+          };
+          updates['teamCodes/' + code] = {
+            teamCode: teamCodeClean,
+            leaderId: leaderId,
+            leaderName: leaderName,
+            teamName: trimmed,
+            createdAt: Date.now()
+          };
+
           await database.ref().update(updates);
           teamCode = teamCodeClean;
           isLeader = true;
@@ -859,6 +873,8 @@
         } catch (e) {
           showToast('❌ Error creating team: ' + e.message, true);
           return false;
+        } finally {
+          isCreatingTeam = false;
         }
       }
 
@@ -1510,10 +1526,9 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: ROUTE UPLOAD – Reliable, with proper event handling
+      // 🔥 FIXED: ROUTE UPLOAD – Robust and reliable
       // ============================================================
       function uploadRoute(file) {
-        console.log('📤 uploadRoute called with file:', file ? file.name : 'null');
         if (!file) {
           showToast('Please select a GPX file.', true);
           return;
@@ -1562,6 +1577,10 @@
                   });
                 renderRouteDropdown();
                 renderRouteList();
+
+                // 🔥 Clear the file input so the user can upload the same file again
+                const fileInput = document.getElementById('gpxFileInput');
+                if (fileInput) fileInput.value = '';
               }).catch((err) => {
                 showToast('❌ Upload failed: ' + err.message, true);
               });
@@ -2058,7 +2077,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: ADMIN PANEL – Upload button with reliable event binding
+      // 🔥 FIXED: ADMIN PANEL with robust upload button binding
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -2140,17 +2159,15 @@
           html += `<div style="margin-top:8px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🗑️ Delete Team</button></div>`;
           $adminPanel.innerHTML = html;
 
-          // ---- Attach events using a reliable approach ----
-          // Upload button: use a direct reference and attach once
+          // ---- Attach events ----
+          // 1. Upload button
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
-
           if (uploadBtn && fileInput) {
-            // Remove any existing listeners by replacing the button
+            // Remove any stale listeners by cloning
             const newBtn = uploadBtn.cloneNode(true);
             uploadBtn.parentNode.replaceChild(newBtn, uploadBtn);
-            // Attach fresh listener
-            newBtn.onclick = function(e) {
+            newBtn.addEventListener('click', function(e) {
               e.preventDefault();
               const input = document.getElementById('gpxFileInput');
               if (input && input.files && input.files.length > 0) {
@@ -2158,37 +2175,51 @@
               } else {
                 showToast('Please select a GPX file first.', true);
               }
-            };
+            });
           }
 
-          // Route selector
+          // 2. Route selector
           const selector = document.getElementById('routeSelector');
           if (selector) {
-            selector.onchange = function() {
+            // Remove old listener by cloning
+            const newSelector = selector.cloneNode(true);
+            selector.parentNode.replaceChild(newSelector, selector);
+            newSelector.addEventListener('change', function() {
               database.ref('teams/' + teamCode + '/activeRouteId').set(this.value || null);
-            };
+            });
           }
 
-          // Start point buttons
+          // 3. Start point buttons
           const setStartBtn = document.getElementById('setStartBtn');
           if (setStartBtn) {
-            setStartBtn.onclick = setStartPoint;
+            const newSet = setStartBtn.cloneNode(true);
+            setStartBtn.parentNode.replaceChild(newSet, setStartBtn);
+            newSet.addEventListener('click', setStartPoint);
           }
           const clearStartBtn = document.getElementById('clearStartBtn');
           if (clearStartBtn) {
-            clearStartBtn.onclick = clearStartPoint;
+            const newClear = clearStartBtn.cloneNode(true);
+            clearStartBtn.parentNode.replaceChild(newClear, clearStartBtn);
+            newClear.addEventListener('click', clearStartPoint);
           }
 
-          // Kick buttons
+          // 4. Kick buttons
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
-            btn.onclick = (e) => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', function(e) {
               e.stopPropagation();
-              kickUser(btn.dataset.uid, btn.dataset.name);
-            };
+              kickUser(this.dataset.uid, this.dataset.name);
+            });
           });
 
+          // 5. Delete team button
           const deleteBtn = document.getElementById('deleteTeamBtn');
-          if (deleteBtn) deleteBtn.onclick = deleteTeam;
+          if (deleteBtn) {
+            const newDelete = deleteBtn.cloneNode(true);
+            deleteBtn.parentNode.replaceChild(newDelete, deleteBtn);
+            newDelete.addEventListener('click', deleteTeam);
+          }
 
           renderRouteDropdown();
           renderRouteList();
@@ -2201,7 +2232,12 @@
               <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🚪 Leave Team</button>
             </div>
           `;
-          document.getElementById('leaveTeamBtn')?.addEventListener('click', leaveTeam);
+          const leaveBtn = document.getElementById('leaveTeamBtn');
+          if (leaveBtn) {
+            const newLeave = leaveBtn.cloneNode(true);
+            leaveBtn.parentNode.replaceChild(newLeave, leaveBtn);
+            newLeave.addEventListener('click', leaveTeam);
+          }
         }
       }
 
