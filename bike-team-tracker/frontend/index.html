@@ -561,6 +561,34 @@
         $myNameInput.value = myName;
         $statusSelect.value = myStatus;
 
+        // ------------------------------------------------
+        // 🔥 RESTORE RIDE SESSION (Fixes idle reset issue)
+        // ------------------------------------------------
+        const session = restoreRideSession();
+        if (session && session.isTracking && session.lastPos) {
+          // Restore the ride state
+          isTracking = true;
+          trackStartTime = session.trackStartTime;
+          myTotalDistance = session.myTotalDistance || 0;
+          myRoutePoints = session.myRoutePoints || [];
+          myLastPosition = session.lastPos;
+          
+          // Update UI immediately
+          updateMyStats();
+          updateMyMarker();
+          updateMyTrail();
+          
+          // Update button states
+          $btnStart.style.display = 'none';
+          $btnStop.style.display = 'inline-flex';
+          $statusText.textContent = 'LIVE';
+          $statusText.style.color = 'var(--success)';
+          
+          showToast('🔄 Ride restored from idle state.');
+          console.log('✅ Ride session restored:', session);
+        }
+        // ------------------------------------------------
+
         if (window.innerWidth <= 768) {
           $sidebar.classList.add('hidden');
           $sidebar.style.transform = 'translateX(-100%)';
@@ -698,39 +726,38 @@
         });
 
         // Listen for active route ID (shared across all users)
-    // Listen for active route ID (shared across all users)
-const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
-activeRouteRef.on('value', (snapshot) => {
-  const activeId = snapshot.val();
-  routeLayerGroup.clearLayers();
+        const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
+        activeRouteRef.on('value', (snapshot) => {
+          const activeId = snapshot.val();
+          routeLayerGroup.clearLayers();
 
-  // Update the dropdown if it exists (so the leader sees the selection)
-  const selector = document.getElementById('routeSelector');
-  if (selector && activeId) {
-    // Check if the option exists, if not, wait for routes to load
-    const optionExists = selector.querySelector(`option[value="${activeId}"]`);
-    if (optionExists) {
-      selector.value = activeId;
-    }
-  }
+          // Update the dropdown if it exists (so the leader sees the selection)
+          const selector = document.getElementById('routeSelector');
+          if (selector && activeId) {
+            // Check if the option exists, if not, wait for routes to load
+            const optionExists = selector.querySelector(`option[value="${activeId}"]`);
+            if (optionExists) {
+              selector.value = activeId;
+            }
+          }
 
-  if (activeId) {
-    database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
-      const route = snap.val();
-      if (route && route.points && route.points.length > 1) {
-        const polyline = L.polyline(route.points, { 
-          color: '#ffd93d', 
-          weight: 5, 
-          opacity: 0.8, 
-          dashArray: '10 6' 
+          if (activeId) {
+            database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
+              const route = snap.val();
+              if (route && route.points && route.points.length > 1) {
+                const polyline = L.polyline(route.points, { 
+                  color: '#ffd93d', 
+                  weight: 5, 
+                  opacity: 0.8, 
+                  dashArray: '10 6' 
+                });
+                polyline.addTo(routeLayerGroup);
+                polyline.bindPopup(`🗺️ ${route.name || 'Route'}`);
+                showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
+              }
+            });
+          }
         });
-        polyline.addTo(routeLayerGroup);
-        polyline.bindPopup(`🗺️ ${route.name || 'Route'}`);
-        showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
-      }
-    });
-  }
-});
 
         // Stale user check
         setInterval(() => {
@@ -827,32 +854,37 @@ activeRouteRef.on('value', (snapshot) => {
         return points;
       }
 
-     function uploadRoute(file) {
-  if (!file) { showToast('Please select a GPX file.', true); return; }
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const gpxText = e.target.result;
-    const points = parseGPX(gpxText);
-    if (points.length < 2) {
-      showToast('Invalid GPX file or no track points.', true);
-      return;
-    }
-    const routeRef = database.ref('teams/' + teamCode + '/savedRoutes').push();
-    routeRef.set({
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      points: points,
-      createdAt: Date.now()
-    }).then(() => {
-      showToast('✅ Route uploaded and activated!');
-      // 🚀 AUTO-ACTIVATE the route immediately
-      database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
-        .catch(err => showToast('⚠️ Route saved but failed to activate: ' + err.message, true));
-    }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
-  };
-  reader.readAsText(file);
-}
+      // ============================================================
+      // 8. 🔥 UPLOAD ROUTE (Auto-Activates)
+      // ============================================================
+      function uploadRoute(file) {
+        if (!file) { showToast('Please select a GPX file.', true); return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const gpxText = e.target.result;
+          const points = parseGPX(gpxText);
+          if (points.length < 2) {
+            showToast('Invalid GPX file or no track points.', true);
+            return;
+          }
+          const routeRef = database.ref('teams/' + teamCode + '/savedRoutes').push();
+          routeRef.set({
+            name: file.name.replace(/\.[^/.]+$/, ""),
+            points: points,
+            createdAt: Date.now()
+          }).then(() => {
+            showToast('✅ Route uploaded and activated!');
+            // 🚀 AUTO-ACTIVATE the route immediately
+            database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
+              .catch(err => showToast('⚠️ Route saved but failed to activate: ' + err.message, true));
+          }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
+        };
+        reader.readAsText(file);
+      }
 
-      // Leave team
+      // ============================================================
+      // 9. LEAVE TEAM
+      // ============================================================
       function leaveTeam() {
         if (!teamCode) return;
         if (isLeader) {
@@ -873,7 +905,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 8. VALIDATE USERNAME
+      // 10. VALIDATE USERNAME
       // ============================================================
       function validateAndSetUsername(newName) {
         if (!newName || newName.trim() === '') {
@@ -916,7 +948,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 9. MAP & GEOLOCATION
+      // 11. MAP & GEOLOCATION
       // ============================================================
       function initMap() {
         map = L.map('map', {
@@ -926,14 +958,14 @@ activeRouteRef.on('value', (snapshot) => {
           attributionControl: true
         });
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-      L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap, &copy; CartoDB',
-  maxZoom: 19
-}).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap',
+          maxZoom: 19
+        }).addTo(map);
 
         markerLayerGroup.addTo(map);
         trailLayerGroup.addTo(map);
-        routeLayerGroup.addTo(map); // Add route layer
+        routeLayerGroup.addTo(map);
 
         map.on('dragstart', () => { followMode = false; });
         map.on('dblclick', () => {
@@ -1023,7 +1055,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 10. MANUAL LOCATION
+      // 12. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
         stopGeolocation();
@@ -1056,7 +1088,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 11. HELPERS
+      // 13. HELPERS
       // ============================================================
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
@@ -1137,7 +1169,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 12. UI UPDATES
+      // 14. UI UPDATES
       // ============================================================
       function updateMyStats() {
         const dist = myTotalDistance;
@@ -1221,7 +1253,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 13. 🔥 UPDATED ADMIN PANEL (Leader: Code + Routes | Member: Leave)
+      // 15. 🔥 UPDATED ADMIN PANEL (Leader: Code + Routes | Member: Leave)
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
@@ -1342,13 +1374,17 @@ activeRouteRef.on('value', (snapshot) => {
       };
 
       // ============================================================
-      // 14. TRACKING CONTROLS
+      // 16. TRACKING CONTROLS
       // ============================================================
       function startTracking() {
         if (!myLastPosition) {
           showToast('⚠️ No location yet. Wait for GPS or set manual location.');
           return;
         }
+
+        // 🔥 Clear any old session when starting a fresh ride
+        clearRideSession();
+
         isTracking = true;
         trackStartTime = Date.now();
         myTotalDistance = 0;
@@ -1381,6 +1417,10 @@ activeRouteRef.on('value', (snapshot) => {
         updateMyStats();
         updateTeamList();
         broadcastMyPosition();
+        
+        // 🔥 Clear the ride session
+        clearRideSession();
+        
         showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
       }
 
@@ -1399,7 +1439,49 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 15. TEST FIREBASE
+      // 17. 🔥 RIDE SESSION PERSISTENCE (Prevents data loss on idle/lock)
+      // ============================================================
+      const SESSION_KEY = 'biketeam_ridesession';
+
+      function saveRideSession() {
+        if (!isTracking) {
+          localStorage.removeItem(SESSION_KEY);
+          return;
+        }
+        try {
+          const session = {
+            isTracking: true,
+            trackStartTime: trackStartTime,
+            myTotalDistance: myTotalDistance,
+            myRoutePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS),
+            lastPos: myLastPosition,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+        } catch (e) {}
+      }
+
+      function restoreRideSession() {
+        try {
+          const raw = localStorage.getItem(SESSION_KEY);
+          if (!raw) return null;
+          const session = JSON.parse(raw);
+          if (Date.now() - session.timestamp > 3600000) { // 1 hour timeout
+            localStorage.removeItem(SESSION_KEY);
+            return null;
+          }
+          return session;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function clearRideSession() {
+        localStorage.removeItem(SESSION_KEY);
+      }
+
+      // ============================================================
+      // 18. TEST FIREBASE
       // ============================================================
       function testFirebaseConnection() {
         if (!teamCode) return;
@@ -1413,7 +1495,7 @@ activeRouteRef.on('value', (snapshot) => {
       }
 
       // ============================================================
-      // 16. EVENT LISTENERS
+      // 19. EVENT LISTENERS
       // ============================================================
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
@@ -1497,12 +1579,23 @@ activeRouteRef.on('value', (snapshot) => {
         }
       });
 
+      // Existing broadcast interval
       setInterval(() => {
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
 
+      // 🔥 NEW: Save ride session every 5 seconds to survive idle/close
+      setInterval(() => {
+        saveRideSession();
+      }, 5000);
+
+      // 🔥 Save session when the app is closed or page is unloaded
+      window.addEventListener('beforeunload', function() {
+        saveRideSession();
+      });
+
       // ============================================================
-      // 17. INIT
+      // 20. INIT
       // ============================================================
       async function init() {
         let storedTeamCode = localStorage.getItem('biketeam_teamcode');
