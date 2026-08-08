@@ -675,6 +675,11 @@
         localStorage.setItem('biketeam_userid', myUserId);
       }
 
+      // ============================================================
+      // 🔥 TEAM CLEANUP CONFIG – Auto-delete after 5 minutes of inactivity
+      // ============================================================
+      const TEAM_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
       // ===== STATE =====
       const UPDATE_INTERVAL_MS = 1500;
       const TRAIL_UPDATE_INTERVAL_MS = 10000;
@@ -719,10 +724,13 @@
       let routeSourceId = null;
       let routeLayerId = null;
       let activeRouteId = null;
-      let startMarker = null; // maplibregl.Marker for the start flag
+      let startMarker = null;
 
       // ---- MY OWN MARKER ----
       let myMarker = null;
+
+      // ---- TEAM CLEANUP ----
+      let teamCleanupInterval = null;
 
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
@@ -830,7 +838,8 @@
           leaderId: leaderId,
           leaderName: leaderName,
           teamName: trimmed,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          lastActivity: Date.now()  // 🔥 Track when the team was last active
         };
         updates['teamCodes/' + code] = {
           teamCode: teamCodeClean,
@@ -875,6 +884,10 @@
         isLeader = false;
         localStorage.setItem('biketeam_teamcode', teamCode);
         localStorage.removeItem('biketeam_isLeader');
+
+        // Update lastActivity when someone joins
+        database.ref('teams/' + teamCode + '/_meta/lastActivity').set(Date.now());
+
         showToast(`✅ Joined team "${data.teamName || 'Unnamed'}"!`);
         startAppWithTeam();
         return true;
@@ -889,6 +902,62 @@
         startAppWithTeam();
       }
 
+      // ============================================================
+      // 🔥 TEAM CLEANUP – Delete team if inactive for too long
+      // ============================================================
+      function startTeamCleanup() {
+        if (teamCleanupInterval) clearInterval(teamCleanupInterval);
+        // Check every 30 seconds
+        teamCleanupInterval = setInterval(() => {
+          if (!teamCode || teamCode === 'openworld') return;
+
+          // Check if the team still exists (meta)
+          database.ref('teams/' + teamCode + '/_meta').once('value').then((snap) => {
+            if (!snap.exists()) {
+              // Team already deleted
+              console.log('🔍 Team already deleted, stopping cleanup.');
+              clearInterval(teamCleanupInterval);
+              return;
+            }
+            const meta = snap.val();
+            const lastActivity = meta.lastActivity || 0;
+            const now = Date.now();
+
+            if (now - lastActivity > TEAM_CLEANUP_TIMEOUT_MS) {
+              // Team has been inactive for too long – delete it
+              console.log(`🧹 Team "${teamCode}" inactive for ${(now - lastActivity)/1000} seconds. Deleting...`);
+
+              // Find the team code entry
+              database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((codeSnap) => {
+                const updates = {};
+                codeSnap.forEach((child) => {
+                  updates['teamCodes/' + child.key] = null;
+                });
+                updates['teams/' + teamCode] = null;
+                return database.ref().update(updates);
+              }).then(() => {
+                showToast('🧹 Team deleted due to inactivity.', true);
+                localStorage.removeItem('biketeam_teamcode');
+                localStorage.removeItem('biketeam_isLeader');
+                if (teamCleanupInterval) clearInterval(teamCleanupInterval);
+                // Reload to show modal
+                setTimeout(() => { location.reload(); }, 1500);
+              }).catch((err) => {
+                console.warn('⚠️ Failed to delete inactive team:', err);
+              });
+            }
+          }).catch((err) => {
+            console.warn('⚠️ Could not check team activity:', err);
+          });
+        }, 30000); // Check every 30 seconds
+      }
+
+      function updateTeamActivity() {
+        if (!teamCode || teamCode === 'openworld') return;
+        database.ref('teams/' + teamCode + '/_meta/lastActivity').set(Date.now())
+          .catch(() => {});
+      }
+
       // ===== START APP =====
       let appStarted = false;
 
@@ -900,6 +969,8 @@
           $sidebarTitle.textContent = '🌍 Open World';
         } else {
           $sidebarTitle.textContent = '👥 Team Panel';
+          // Start cleanup for private teams
+          startTeamCleanup();
         }
 
         initMap();
@@ -991,6 +1062,8 @@
           renderClusters();
           updateTeamList();
           showToast(`👋 ${remoteUsers[snapshot.key]?.userName || 'Rider'} joined!`);
+          // Update activity when someone joins/changes
+          updateTeamActivity();
         });
 
         locationsRef.on('child_changed', (snapshot) => {
@@ -1005,6 +1078,7 @@
               localStorage.removeItem('biketeam_isLeader');
             }
             updateAdminPanel();
+            // Update activity when meta changes (e.g., lastActivity updated by someone)
             return;
           }
           if (remoteUsers[snapshot.key]) {
@@ -1014,6 +1088,8 @@
           }
           renderClusters();
           updateTeamList();
+          // Update activity when any rider updates
+          updateTeamActivity();
         });
 
         locationsRef.on('child_removed', (snapshot) => {
@@ -1023,6 +1099,7 @@
             showToast('❌ You have been removed from the team by the leader.', true);
             localStorage.removeItem('biketeam_teamcode');
             localStorage.removeItem('biketeam_isLeader');
+            if (teamCleanupInterval) clearInterval(teamCleanupInterval);
             location.reload();
             return;
           }
@@ -1069,12 +1146,10 @@
             renderRouteList();
           });
 
-          // Active route listener – replaces the route
           const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
           activeRouteRef.on('value', (snapshot) => {
             const newActiveId = snapshot.val();
 
-            // Remove old route
             if (routeLayerId && map) {
               try {
                 if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
@@ -1092,7 +1167,6 @@
               return;
             }
 
-            // Draw new route
             database.ref('teams/' + teamCode + '/savedRoutes/' + newActiveId).once('value').then((snap) => {
               const route = snap.val();
               if (route && route.points && route.points.length > 1 && map && mapInitialized) {
@@ -1129,11 +1203,9 @@
             });
           });
 
-          // ---- START POINT LISTENER ----
           const startRef = database.ref('teams/' + teamCode + '/startPoint');
           startRef.on('value', (snapshot) => {
             const startData = snapshot.val();
-            // Remove old start marker
             if (startMarker) {
               startMarker.remove();
               startMarker = null;
@@ -1191,6 +1263,8 @@
         myLocationRef.set(data).catch((error) => {
           showToast('❌ Firebase Error: ' + error.message, true);
         });
+        // Update team activity when we broadcast
+        updateTeamActivity();
       }
 
       function updateMyTrailToFirebase() {
@@ -1288,7 +1362,6 @@
 
         const riders = [];
 
-        // Add remote users only (skip self)
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
@@ -1354,13 +1427,12 @@
       }
 
       // ============================================================
-      // 🔥 ADDED: Update my own marker
+      // UPDATE MY MARKER
       // ============================================================
       function updateMyMarker() {
         if (!myLastPosition || !map || !mapInitialized) return;
         const { lat, lng } = myLastPosition;
 
-        // Remove old marker
         if (myMarker) {
           myMarker.remove();
           myMarker = null;
@@ -1388,6 +1460,7 @@
         const userRef = database.ref('teams/' + teamCode + '/' + userId);
         userRef.remove().then(() => {
           showToast(`👢 ${userName} has been kicked.`);
+          updateTeamActivity();
         }).catch((e) => {
           showToast('❌ Error kicking user: ' + e.message, true);
         });
@@ -1408,6 +1481,7 @@
           showToast('🗑️ Team deleted.');
           localStorage.removeItem('biketeam_teamcode');
           localStorage.removeItem('biketeam_isLeader');
+          if (teamCleanupInterval) clearInterval(teamCleanupInterval);
           location.reload();
         }).catch((e) => {
           showToast('❌ Error deleting team: ' + e.message, true);
@@ -1453,7 +1527,7 @@
         return points;
       }
 
-      // ===== ROUTE UPLOAD (Manual) =====
+      // ===== ROUTE UPLOAD =====
       function uploadRoute(file) {
         if (!file) {
           showToast('Please select a GPX file.', true);
@@ -1496,6 +1570,7 @@
                 database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
                   .then(() => {
                     showToast('🗺️ Route activated on map!');
+                    updateTeamActivity();
                   })
                   .catch((err) => {
                     showToast('⚠️ Route saved but activation failed: ' + err.message, true);
@@ -1519,7 +1594,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: SET START POINT – MOVES THE BIKE MARKER
+      // SET START POINT
       // ============================================================
       function setStartPoint() {
         if (!isLeader) {
@@ -1530,7 +1605,6 @@
           showToast('Please select a route first.', true);
           return;
         }
-        // Fetch the active route's first point
         database.ref('teams/' + teamCode + '/savedRoutes/' + activeRouteId).once('value').then((snap) => {
           const route = snap.val();
           if (!route || !route.points || route.points.length === 0) {
@@ -1539,12 +1613,9 @@
           }
           const firstPoint = route.points[0];
           const startData = { lat: firstPoint[0], lng: firstPoint[1] };
-          // Save the start point to Firebase for everyone
           database.ref('teams/' + teamCode + '/startPoint').set(startData)
             .then(() => {
               showToast('🏁 Start point set at the beginning of the route.');
-
-              // 🔥 MOVE THE LEADER'S BIKE MARKER TO THE START POINT
               myLastPosition = {
                 lat: firstPoint[0],
                 lng: firstPoint[1],
@@ -1553,13 +1624,11 @@
                 altitude: null,
                 timestamp: Date.now()
               };
-              // Update the marker on the map
               updateMyMarker();
-              // Center the map on the start point
               map.setCenter([firstPoint[1], firstPoint[0]]);
               map.setZoom(16);
-              // Broadcast the new position so other riders see the leader at the start
               broadcastMyPosition();
+              updateTeamActivity();
               showToast('📍 Your bike marker is now at the start point.');
             })
             .catch((err) => {
@@ -1576,6 +1645,7 @@
         database.ref('teams/' + teamCode + '/startPoint').remove()
           .then(() => {
             showToast('🗑️ Start point cleared.');
+            updateTeamActivity();
           })
           .catch((err) => {
             showToast('❌ Failed to clear start point: ' + err.message, true);
@@ -1594,6 +1664,7 @@
           showToast(`👋 You have left ${teamCode === 'openworld' ? 'Open World' : 'the team'}.`);
           localStorage.removeItem('biketeam_teamcode');
           localStorage.removeItem('biketeam_isLeader');
+          if (teamCleanupInterval) clearInterval(teamCleanupInterval);
           location.reload();
         }).catch((e) => {
           showToast('❌ Error leaving: ' + e.message, true);
@@ -1631,6 +1702,7 @@
               broadcastMyPosition();
               renderClusters();
               updateMyMarker();
+              updateTeamActivity();
               showToast(`✅ Username set to "${myName}"`);
               return true;
             }
@@ -2037,7 +2109,6 @@
             <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
-          // Route upload & select
           html += `<div class="route-controls">
             <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
@@ -2052,7 +2123,6 @@
             <div id="routeListItems"></div>
           </div>`;
 
-          // ---- START POINT CONTROLS ----
           html += `<div class="start-controls">
             <label>🏁 Start Point</label>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -2061,7 +2131,6 @@
             </div>
           </div>`;
 
-          // Member kick list
           const members = [];
           for (const uid in remoteUsers) {
             const u = remoteUsers[uid];
@@ -2081,8 +2150,6 @@
           html += `<div style="margin-top:8px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🗑️ Delete Team</button></div>`;
           $adminPanel.innerHTML = html;
 
-          // ---- Attach events ----
-          // Upload
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
@@ -2098,7 +2165,6 @@
             };
           }
 
-          // Route selector
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
@@ -2106,7 +2172,6 @@
             };
           }
 
-          // Start point buttons
           const setStartBtn = document.getElementById('setStartBtn');
           if (setStartBtn) {
             setStartBtn.onclick = setStartPoint;
@@ -2116,7 +2181,6 @@
             clearStartBtn.onclick = clearStartPoint;
           }
 
-          // Kick buttons
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
             btn.onclick = (e) => {
               e.stopPropagation();
@@ -2129,7 +2193,6 @@
           renderRouteList();
 
         } else {
-          // Regular member
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
             <div style="border-top:1px solid var(--border);padding-top:10px;">
@@ -2183,6 +2246,7 @@
         updateTeamList();
         broadcastMyPosition();
         updateMyTrailToFirebase();
+        updateTeamActivity();
         showToast('🚴 Ride started!');
         if (myLastPosition && map) {
           map.setCenter([myLastPosition.lng, myLastPosition.lat]);
@@ -2210,6 +2274,7 @@
           myTrailRef.remove().catch(() => {});
         }
         clearRideSession();
+        updateTeamActivity();
         showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
       }
 
@@ -2338,6 +2403,7 @@
         updateTeamList();
         renderClusters();
         updateMyMarker();
+        updateTeamActivity();
       });
 
       $myNameInput.addEventListener('change', function() {
