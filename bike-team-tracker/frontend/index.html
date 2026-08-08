@@ -969,102 +969,67 @@
       // 9. 🗺️ MAPLIBRE MAP INITIALIZATION
       // ============================================================
       function initMap() {
-        map = new maplibregl.Map({
-          container: 'map',
-          center: [0, 0],
-          zoom: 14,
-          bearing: 0,
-          pitch: 0,
-          style: 'https://api.maptiler.com/maps/dark-matter/style.json?key=Vaqd2Dd5pt2svNadHUAk'
-        });
+  map = new maplibregl.Map({
+    container: 'map',
+    center: [0, 0],
+    zoom: 14,
+    bearing: 0,
+    pitch: 0,
+    // 🔥 FIXED: Use a free, working style (no API key needed)
+    style: 'https://tiles.openfreemap.org/styles/liberty.json'
+  });
 
-        // Dark style fallback - if the above fails, use a free dark style
-        // You can also use: 'https://demotiles.maplibre.org/style.json' (light)
+  // Handle map load
+  map.on('load', function() {
+    mapInitialized = true;
+    console.log('🗺️ Map loaded');
+    
+    // Add controls
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+    
+    const geolocateControl = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserHeading: true,
+      showAccuracyCircle: true
+    });
+    map.addControl(geolocateControl, 'bottom-right');
 
-        map.on('load', function() {
-          mapInitialized = true;
-          console.log('🗺️ Map loaded');
-          
-          // Add navigation control (zoom + compass) - the compass automatically rotates
-          map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: false }), 'bottom-right');
-          
-          // Add geolocate control - shows a dot on your location with heading
-          const geolocateControl = new maplibregl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true },
-            trackUserLocation: true,
-            showUserHeading: true,
-            showAccuracyCircle: true
-          });
-          map.addControl(geolocateControl, 'bottom-right');
-
-          // Listen for geolocate events
-          map.on('geolocate', function(e) {
-            // Update our own position from the geolocate event
-            const coords = e.coords;
-            if (coords) {
-              // The geolocate control handles the user dot automatically
-              // We just need to update our own state
-            }
-          });
-
-          // Listen for bearing changes (compass rotation)
-          map.on('rotate', function() {
-            // Map rotation is handled natively
-          });
-
-          // Zoom handler
-          map.on('zoom', function() {
-            // Zoom changed
-          });
-
-          // Set initial center if we have a position
-          if (myLastPosition) {
-            map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-          }
-
-          // Update follow mode
-          map.on('dragstart', () => { followMode = false; });
-          map.on('dblclick', () => {
-            followMode = true;
-            if (myLastPosition) {
-              map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-            }
-          });
-
-          // Click to close sidebar
-          map.on('click', () => {
-            if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
-              $sidebar.classList.add('hidden');
-              $sidebar.style.transform = 'translateX(-100%)';
-            }
-          });
-
-          // Re-apply markers after map loads
-          if (myLastPosition) {
-            updateMyMarker();
-            updateMyTrail();
-          }
-          updateRemoteMarkers();
-
-          // Apply any saved route
-          if (routeLayerId) {
-            // Route will be re-added via listener
-          }
-
-          // Auto-follow if we have a position
-          if (myLastPosition && followMode) {
-            map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-          }
-        });
-
-        // If map fails to load, use a simpler tile style
-        map.on('error', function() {
-          console.warn('Map style error, using fallback');
-          if (!map.getStyle()) {
-            map.setStyle('https://demotiles.maplibre.org/style.json');
-          }
-        });
+    // Follow mode
+    map.on('dragstart', () => { followMode = false; });
+    map.on('dblclick', () => {
+      followMode = true;
+      if (myLastPosition) {
+        map.setCenter([myLastPosition.lng, myLastPosition.lat]);
       }
+    });
+
+    map.on('click', () => {
+      if (window.innerWidth <= 768 && !$sidebar.classList.contains('hidden')) {
+        $sidebar.classList.add('hidden');
+        $sidebar.style.transform = 'translateX(-100%)';
+      }
+    });
+
+    // Re-apply markers
+    if (myLastPosition) {
+      updateMyMarker();
+      updateMyTrail();
+    }
+    updateRemoteMarkers();
+    if (myLastPosition && followMode) {
+      map.setCenter([myLastPosition.lng, myLastPosition.lat]);
+    }
+  });
+
+  // Error fallback
+  map.on('error', function() {
+    console.warn('Map style error, using fallback');
+    if (!map.getStyle()) {
+      map.setStyle('https://demotiles.maplibre.org/style.json');
+    }
+  });
+}
 
       // ============================================================
       // 10. MAPLIBRE MARKER FUNCTIONS
