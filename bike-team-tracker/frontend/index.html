@@ -542,6 +542,19 @@
       border-color: var(--accent2);
       box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
     }
+    .custom-marker.cluster-marker {
+      width: 60px;
+      height: 60px;
+      font-size: 1.8rem;
+      background: rgba(22, 33, 62, 0.9);
+      border-color: #ffd93d;
+      box-shadow: 0 0 30px rgba(255, 217, 61, 0.4);
+      animation: pulse-cluster 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-cluster {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
     @keyframes bounce-marker {
       from { transform: translateY(0); }
       to { transform: translateY(-5px); }
@@ -555,7 +568,6 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <!-- 🧭 Compass button removed from header -->
   </header>
 
   <div class="main-container">
@@ -655,6 +667,7 @@
       const TRAIL_UPDATE_INTERVAL_MS = 10000;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
+      const CLUSTER_DISTANCE_KM = 0.01; // 10 meters
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
         '#4ecdc4', '#ffe66d', '#a29bfe'
       ];
@@ -682,12 +695,13 @@
       let mapInitialized = false;
       let followMode = true;
 
-      const MY_MARKER_SOURCE = 'my-marker-source';
-      const MY_MARKER_LAYER = 'my-marker-layer';
+      // ===== CLUSTERING MARKERS =====
+      let clusterMarkers = [];
+
+      // Trail layers
       const MY_TRAIL_SOURCE = 'my-trail-source';
       const MY_TRAIL_LAYER = 'my-trail-layer';
 
-      let remoteMarkers = {};
       let remoteTrails = {};
       let routeLayerId = null;
 
@@ -866,7 +880,7 @@
           myRoutePoints = session.myRoutePoints || [];
           myLastPosition = session.lastPos;
           updateMyStats();
-          updateMyMarker();
+          renderClusters();
           updateMyTrail();
           $btnStart.style.display = 'none';
           $btnStop.style.display = 'inline-flex';
@@ -939,7 +953,7 @@
             return;
           }
           remoteUsers[snapshot.key] = snapshot.val();
-          updateRemoteMarkers();
+          renderClusters();
           updateTeamList();
           showToast(`👋 ${remoteUsers[snapshot.key]?.userName || 'Rider'} joined!`);
         });
@@ -963,7 +977,7 @@
           } else {
             remoteUsers[snapshot.key] = snapshot.val();
           }
-          updateRemoteMarkers();
+          renderClusters();
           updateTeamList();
         });
 
@@ -978,11 +992,11 @@
             return;
           }
           if (remoteUsers[uid]) {
-            removeRemoteMarker(uid);
+            delete remoteUsers[uid];
+            delete remoteTrailPoints[uid];
+            removeRemoteTrail(uid);
           }
-          delete remoteUsers[uid];
-          delete remoteTrailPoints[uid];
-          removeRemoteTrail(uid);
+          renderClusters();
           updateTeamList();
         });
 
@@ -1078,7 +1092,7 @@
             }
           }
           if (updated) {
-            updateRemoteMarkers();
+            renderClusters();
             updateTeamList();
           }
         }, 5000);
@@ -1149,38 +1163,6 @@
         } catch (e) {}
       }
 
-      // ===== MARKERS =====
-      function updateRemoteMarkers() {
-        if (!map || !mapInitialized) return;
-        for (const uid in remoteUsers) {
-          const u = remoteUsers[uid];
-          if (!u.lat || !u.lng) continue;
-          if (remoteMarkers[uid]) {
-            remoteMarkers[uid].remove();
-            remoteMarkers[uid] = null;
-          }
-          const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
-          const el = createMarkerElement('🚴‍♂️', u.color || '#888');
-          el.style.opacity = isOffline ? 0.5 : 1;
-          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([u.lng, u.lat])
-            .addTo(map);
-          const popup = new maplibregl.Popup({ offset: [0, -15] })
-            .setHTML(
-              `<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
-            );
-          marker.setPopup(popup);
-          remoteMarkers[uid] = marker;
-        }
-      }
-
-      function removeRemoteMarker(uid) {
-        if (remoteMarkers[uid]) {
-          remoteMarkers[uid].remove();
-          delete remoteMarkers[uid];
-        }
-      }
-
       function removeRemoteTrail(uid) {
         if (remoteTrails[uid]) {
           try {
@@ -1189,6 +1171,131 @@
             if (map.getSource(id)) map.removeSource(id);
           } catch (e) {}
           delete remoteTrails[uid];
+        }
+      }
+
+      // ===== CLUSTERING LOGIC =====
+      function getClusters(riders) {
+        const clusters = [];
+        const used = new Set();
+        for (let i = 0; i < riders.length; i++) {
+          if (used.has(i)) continue;
+          const cluster = {
+            riders: [riders[i]],
+            lat: riders[i].lat,
+            lng: riders[i].lng
+          };
+          used.add(i);
+          for (let j = i + 1; j < riders.length; j++) {
+            if (used.has(j)) continue;
+            const dist = haversineDistance(riders[i].lat, riders[i].lng, riders[j].lat, riders[j].lng);
+            if (dist < CLUSTER_DISTANCE_KM) {
+              cluster.riders.push(riders[j]);
+              used.add(j);
+              // Recompute centroid
+              let sumLat = 0,
+                sumLng = 0;
+              for (const r of cluster.riders) {
+                sumLat += r.lat;
+                sumLng += r.lng;
+              }
+              cluster.lat = sumLat / cluster.riders.length;
+              cluster.lng = sumLng / cluster.riders.length;
+            }
+          }
+          clusters.push(cluster);
+        }
+        return clusters;
+      }
+
+      // ===== RENDER CLUSTERS =====
+      function renderClusters() {
+        if (!map || !mapInitialized) return;
+
+        // Collect all riders
+        const riders = [];
+
+        // Add self
+        if (myLastPosition) {
+          riders.push({
+            id: myUserId,
+            lat: myLastPosition.lat,
+            lng: myLastPosition.lng,
+            name: myName,
+            color: myColor,
+            status: myStatus,
+            isYou: true,
+            isActive: true,
+            speed: myCurrentSpeed
+          });
+        }
+
+        // Add remote users
+        for (const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          if (!u.lat || !u.lng) continue;
+          const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
+          riders.push({
+            id: uid,
+            lat: u.lat,
+            lng: u.lng,
+            name: u.userName || 'Rider',
+            color: u.color || '#888',
+            status: u.status || '🟢',
+            isYou: false,
+            isActive: !isOffline && u.isTracking,
+            speed: u.speed || 0
+          });
+        }
+
+        // Compute clusters
+        const clusters = getClusters(riders);
+
+        // Remove old markers
+        for (const m of clusterMarkers) {
+          m.remove();
+        }
+        clusterMarkers = [];
+
+        // Create new markers for each cluster
+        for (const cluster of clusters) {
+          const isCluster = cluster.riders.length > 1;
+          const emoji = isCluster ? '🚴🚴' : '🚴';
+          const color = isCluster ? '#ffd93d' : cluster.riders[0].color;
+          const isYouInCluster = cluster.riders.some(r => r.isYou);
+
+          const el = document.createElement('div');
+          el.className = 'custom-marker' + (isCluster ? ' cluster-marker' : '') + (isYouInCluster && !isCluster ?
+            ' you-marker' : '');
+          el.style.backgroundColor = color;
+          el.textContent = emoji;
+          if (isCluster) {
+            el.style.color = '#000';
+          }
+
+          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([cluster.lng, cluster.lat])
+            .addTo(map);
+
+          // Build popup content
+          let popupHTML = '';
+          for (const r of cluster.riders) {
+            const label = r.isYou ? ' (You)' : '';
+            const statusEmoji = r.status || '🟢';
+            popupHTML += `<b>${escapeHtml(r.name)}</b>${label} ${statusEmoji}<br>`;
+          }
+          if (isCluster) {
+            popupHTML += `<span style="font-size:0.7rem;color:var(--text-secondary);">${cluster.riders.length} riders together</span>`;
+          } else {
+            const r = cluster.riders[0];
+            popupHTML += `Speed: ${(r.speed || 0).toFixed(1)} km/h`;
+          }
+
+          const popup = new maplibregl.Popup({ offset: [0, -15] })
+            .setHTML(popupHTML);
+          marker.setPopup(popup);
+
+          clusterMarkers.push(marker);
         }
       }
 
@@ -1323,7 +1430,7 @@
               localStorage.setItem('biketeam_myname', myName);
               updateTeamList();
               broadcastMyPosition();
-              updateMyMarker();
+              renderClusters();
               showToast(`✅ Username set to "${myName}"`);
               return true;
             }
@@ -1371,27 +1478,7 @@
             }
           });
 
-          map.addSource(MY_MARKER_SOURCE, {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: [] }
-          });
-          map.addLayer({
-            id: MY_MARKER_LAYER,
-            type: 'symbol',
-            source: MY_MARKER_SOURCE,
-            layout: {
-              'text-field': '🚴',
-              'text-size': 32,
-              'text-anchor': 'center',
-              'text-offset': [0, 0]
-            },
-            paint: {
-              'text-color': myColor,
-              'text-halo-color': '#1a1a2e',
-              'text-halo-width': 2
-            }
-          });
-
+          // My Trail layer
           map.addSource(MY_TRAIL_SOURCE, {
             type: 'geojson',
             data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
@@ -1408,10 +1495,9 @@
           });
 
           if (myLastPosition) {
-            updateMyMarker();
+            renderClusters();
             updateMyTrail();
           }
-          updateRemoteMarkers();
           if (myLastPosition && followMode) {
             map.setCenter([myLastPosition.lng, myLastPosition.lat]);
           }
@@ -1422,27 +1508,6 @@
             map.setStyle('https://demotiles.maplibre.org/style.json');
           }
         });
-      }
-
-      // ===== MARKERS =====
-      function updateMyMarker() {
-        if (!myLastPosition || !map || !mapInitialized) return;
-        const { lat, lng } = myLastPosition;
-        if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0 && !myLastPosition.timestamp)) return;
-        const source = map.getSource(MY_MARKER_SOURCE);
-        if (source) {
-          source.setData({
-            type: 'FeatureCollection',
-            features: [{
-              type: 'Feature',
-              geometry: { type: 'Point', coordinates: [lng, lat] },
-              properties: { name: myName, speed: myCurrentSpeed, status: myStatus }
-            }]
-          });
-        }
-        if (map.getLayer(MY_MARKER_LAYER)) {
-          map.setPaintProperty(MY_MARKER_LAYER, 'text-color', myColor);
-        }
       }
 
       function updateMyTrail() {
@@ -1457,14 +1522,6 @@
             }
           });
         }
-      }
-
-      function createMarkerElement(emoji, color) {
-        const el = document.createElement('div');
-        el.className = 'custom-marker';
-        el.style.backgroundColor = color || '#888';
-        el.textContent = emoji;
-        return el;
       }
 
       // ===== GEOLOCATION =====
@@ -1493,7 +1550,7 @@
             myLastPosition = newPos;
 
             updateMyStats();
-            updateMyMarker();
+            renderClusters();
             updateMyTrail();
             broadcastMyPosition();
 
@@ -1556,7 +1613,6 @@
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
           lastCompassBearing = 360 - alpha;
-          // ✅ Only rotate the map if tracking is active
           if (isTracking) {
             updateMapBearing(lastCompassBearing);
           }
@@ -1574,11 +1630,6 @@
         } else {
           showToast('⚠️ Compass not available.', true);
         }
-      }
-
-      function enableCompass() {
-        // This function is no longer needed – compass is always active but only rotates when tracking.
-        // The "North" button resets bearing to 0.
       }
 
       // ===== HELPERS =====
@@ -1623,18 +1674,21 @@
 
       function updateTeamList() {
         const members = [];
-        members.push({
-          id: myUserId,
-          name: myName,
-          color: myColor,
-          speed: myCurrentSpeed,
-          distance: myTotalDistance,
-          isYou: true,
-          isActive: isTracking || useManualLocation,
-          isTracking: isTracking,
-          emoji: '🚴',
-          status: myStatus
-        });
+        // Self
+        if (myLastPosition) {
+          members.push({
+            id: myUserId,
+            name: myName,
+            color: myColor,
+            speed: myCurrentSpeed,
+            distance: myTotalDistance,
+            isYou: true,
+            isActive: isTracking || useManualLocation,
+            isTracking: isTracking,
+            emoji: '🚴',
+            status: myStatus
+          });
+        }
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
@@ -1858,13 +1912,16 @@
       }
 
       window.highlightUser = function(uid) {
+        // Find the cluster containing this user and center on it
         if (uid === myUserId && myLastPosition) {
           if (map) map.setCenter([myLastPosition.lng, myLastPosition.lat]);
           followMode = true;
           return;
         }
-        if (remoteUsers[uid] && remoteUsers[uid].lat) {
-          if (map) map.setCenter([remoteUsers[uid].lng, remoteUsers[uid].lat]);
+        // Find remote user
+        const user = remoteUsers[uid];
+        if (user && user.lat) {
+          if (map) map.setCenter([user.lng, user.lat]);
           followMode = false;
         }
       };
@@ -1884,7 +1941,6 @@
         ];
         updateMyTrail();
 
-        // 🧭 Resume compass rotation immediately
         if (isOrientationActive && map) {
           if (lastCompassBearing !== 0) {
             updateMapBearing(lastCompassBearing);
@@ -1919,7 +1975,6 @@
         updateTeamList();
         broadcastMyPosition();
 
-        // 🔒 Lock map to North when stopped
         if (map) {
           map.setBearing(0);
         }
@@ -1931,14 +1986,9 @@
         showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
       }
 
-      // ============================================================
-      // 🔥 FIXED: Toast messages no longer overlap
-      // Each new toast replaces the previous one
-      // ============================================================
       let currentToast = null;
 
       function showToast(msg, isError = false) {
-        // Remove existing toast if any
         if (currentToast && currentToast.parentNode) {
           currentToast.remove();
           currentToast = null;
@@ -1950,7 +2000,6 @@
         $toastContainer.appendChild(toast);
         currentToast = toast;
 
-        // Auto-remove after 3 seconds
         setTimeout(() => {
           if (toast.parentNode) {
             toast.remove();
@@ -2060,7 +2109,7 @@
         localStorage.setItem('biketeam_mystatus', myStatus);
         broadcastMyPosition();
         updateTeamList();
-        updateMyMarker();
+        renderClusters();
       });
 
       $myNameInput.addEventListener('change', function() {
