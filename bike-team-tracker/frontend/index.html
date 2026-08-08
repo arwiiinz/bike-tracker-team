@@ -381,7 +381,7 @@
 
     #controls-overlay {
       position: absolute;
-      bottom: 30%;
+      bottom: 20%;
       left: 50%;
       transform: translateX(-50%);
       z-index: 500;
@@ -499,7 +499,7 @@
       #stats-overlay { top: 8px; padding: 8px 16px; gap: 14px; min-width: 160px; border-radius: 12px; }
       #stats-overlay .stat-value { font-size: 1.1rem; }
       #stats-overlay .stat-label { font-size: 0.45rem; }
-      #controls-overlay { bottom: 30%; }
+      #controls-overlay { bottom: 20%; }
       #controls-overlay .btn { font-size: 1rem; padding: 12px 28px; min-height: 50px; min-width: 110px; }
       .modal-box { padding: 20px 16px; }
       .modal-box h2 { font-size: 1.2rem; }
@@ -513,7 +513,7 @@
       #stats-overlay { gap: 10px; padding: 6px 12px; min-width: 130px; top: 6px; }
       #stats-overlay .stat-value { font-size: 0.9rem; }
       #stats-overlay .divider { height: 18px; }
-      #controls-overlay { bottom: 25%; }
+      #controls-overlay { bottom: 20%; }
       #controls-overlay .btn { font-size: 0.85rem; padding: 10px 20px; min-height: 44px; min-width: 90px; }
       .member-card { padding: 6px 10px; min-height: 40px; }
       .member-dot { width: 28px; height: 28px; font-size: 0.9rem; }
@@ -534,14 +534,6 @@
       background: var(--panel);
       border: 2px solid transparent;
     }
-    .custom-marker.you-marker {
-      animation: bounce-marker 0.6s ease infinite alternate;
-      font-size: 2rem;
-      width: 50px;
-      height: 50px;
-      border-color: var(--accent2);
-      box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
-    }
     .custom-marker.cluster-marker {
       width: 60px;
       height: 60px;
@@ -555,10 +547,6 @@
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.08); }
     }
-    @keyframes bounce-marker {
-      from { transform: translateY(0); }
-      to { transform: translateY(-5px); }
-    }
   </style>
 </head>
 <body>
@@ -568,7 +556,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <!-- Compass button removed from header -->
+    <!-- Compass button removed -->
   </header>
 
   <div class="main-container">
@@ -668,7 +656,8 @@
       const TRAIL_UPDATE_INTERVAL_MS = 10000;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
-      const CLUSTER_DISTANCE_KM = 0.01; // 10 meters
+      // 🔥 Cluster distance set to 50 meters (0.05 km)
+      const CLUSTER_DISTANCE_KM = 0.05;
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
         '#4ecdc4', '#ffe66d', '#a29bfe'
       ];
@@ -1209,32 +1198,21 @@
         return clusters;
       }
 
-      // ===== RENDER CLUSTERS =====
+      // ===== RENDER CLUSTERS (SELF REMOVED) =====
       function renderClusters() {
         if (!map || !mapInitialized) return;
 
-        // Collect all riders
+        // Collect riders (ONLY REMOTE USERS)
         const riders = [];
 
-        // Add self
-        if (myLastPosition) {
-          riders.push({
-            id: myUserId,
-            lat: myLastPosition.lat,
-            lng: myLastPosition.lng,
-            name: myName,
-            color: myColor,
-            status: myStatus,
-            isYou: true,
-            isActive: true,
-            speed: myCurrentSpeed
-          });
-        }
+        // 🔥 SELF IS REMOVED – YOU WILL NOT SEE YOURSELF ON THE MAP
 
-        // Add remote users
+        // Add remote users with valid coordinates
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
+          if (isNaN(u.lat) || isNaN(u.lng)) continue;
+          if (u.lat === 0 && u.lng === 0 && !u.timestamp) continue;
           const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
           riders.push({
             id: uid,
@@ -1247,6 +1225,13 @@
             isActive: !isOffline && u.isTracking,
             speed: u.speed || 0
           });
+        }
+
+        // If no riders, clear markers and return
+        if (riders.length === 0) {
+          for (const m of clusterMarkers) m.remove();
+          clusterMarkers = [];
+          return;
         }
 
         // Compute clusters
@@ -1262,12 +1247,12 @@
         for (const cluster of clusters) {
           const isCluster = cluster.riders.length > 1;
           const emoji = isCluster ? '🚴🚴' : '🚴';
+          // Use the first rider's color, or gold for clusters
           const color = isCluster ? '#ffd93d' : cluster.riders[0].color;
-          const isYouInCluster = cluster.riders.some(r => r.isYou);
 
           const el = document.createElement('div');
-          el.className = 'custom-marker' + (isCluster ? ' cluster-marker' : '') + (isYouInCluster && !isCluster ?
-            ' you-marker' : '');
+          // Add cluster class if it's a cluster
+          el.className = 'custom-marker' + (isCluster ? ' cluster-marker' : '');
           el.style.backgroundColor = color;
           el.textContent = emoji;
           if (isCluster) {
@@ -1281,9 +1266,8 @@
           // Build popup content
           let popupHTML = '';
           for (const r of cluster.riders) {
-            const label = r.isYou ? ' (You)' : '';
             const statusEmoji = r.status || '🟢';
-            popupHTML += `<b>${escapeHtml(r.name)}</b>${label} ${statusEmoji}<br>`;
+            popupHTML += `<b>${escapeHtml(r.name)}</b> ${statusEmoji}<br>`;
           }
           if (isCluster) {
             popupHTML += `<span style="font-size:0.7rem;color:var(--text-secondary);">${cluster.riders.length} riders together</span>`;
@@ -1624,7 +1608,7 @@
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
           if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            showToast('🍎 Tap "North" button to enable compass rotation.', false);
+            // Silent for iOS
           } else {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass active – map rotates with your phone!');
@@ -1676,7 +1660,7 @@
 
       function updateTeamList() {
         const members = [];
-        // Self
+        // Self is not shown on map, but we still show it in the sidebar list
         if (myLastPosition) {
           members.push({
             id: myUserId,
@@ -1914,7 +1898,6 @@
       }
 
       window.highlightUser = function(uid) {
-        // Find the cluster containing this user and center on it
         if (uid === myUserId && myLastPosition) {
           if (map) map.setCenter([myLastPosition.lng, myLastPosition.lat]);
           followMode = true;
