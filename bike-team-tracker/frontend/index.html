@@ -849,28 +849,40 @@
       }
 
       function uploadRoute(file) {
-        if (!file) { showToast('Please select a GPX file.', true); return; }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const gpxText = e.target.result;
-          const points = parseGPX(gpxText);
-          if (points.length < 2) {
-            showToast('Invalid GPX file or no track points.', true);
-            return;
-          }
-          const routeRef = database.ref('teams/' + teamCode + '/savedRoutes').push();
-          routeRef.set({
-            name: file.name.replace(/\.[^/.]+$/, ""),
-            points: points,
-            createdAt: Date.now()
-          }).then(() => {
-            showToast('✅ Route uploaded and activated!');
-            database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
-              .catch(err => showToast('⚠️ Route saved but failed to activate: ' + err.message, true));
-          }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
-        };
-        reader.readAsText(file);
+  if (!file) { showToast('Please select a GPX file.', true); return; }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const gpxText = e.target.result;
+    const points = parseGPX(gpxText);
+    if (points.length < 2) {
+      showToast('Invalid GPX file or no track points.', true);
+      return;
+    }
+
+    // ✅ Check the 5-route limit
+    const routesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+    routesRef.once('value').then((snap) => {
+      if (snap.numChildren() >= 5) {
+        showToast('⚠️ Maximum 5 routes per team. Delete an existing route first.', true);
+        return;
       }
+
+      const routeRef = routesRef.push();
+      routeRef.set({
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        points: points,
+        createdAt: Date.now()
+      }).then(() => {
+        showToast('✅ Route uploaded and activated!');
+        // ✅ Auto-activate the newly uploaded route
+        database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
+          .catch(err => showToast('⚠️ Route saved but failed to activate: ' + err.message, true));
+      }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
+    });
+  };
+  reader.readAsText(file);
+}
 
       function leaveTeam() {
         if (!teamCode) return;
@@ -1472,100 +1484,157 @@
       // ============================================================
       // 20. ADMIN PANEL (unchanged)
       // ============================================================
-      function updateAdminPanel() {
-        if (!teamCode) {
-          $adminPanel.style.display = 'none';
-          return;
-        }
+      // ---- LEADER VIEW ----
+$adminPanel.style.display = 'block';
 
-        if (isLeader) {
-          $adminPanel.style.display = 'block';
-          
-          let codeDisplay = 'Loading...';
-          database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((snap) => {
-            let foundCode = '';
-            snap.forEach((child) => { foundCode = child.key; });
-            if (foundCode) {
-              const el = document.getElementById('teamCodeDisplay');
-              if (el) el.textContent = foundCode;
-            }
-          });
+// Fetch the team code
+let codeDisplay = 'Loading...';
+database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((snap) => {
+  let foundCode = '';
+  snap.forEach((child) => { foundCode = child.key; });
+  if (foundCode) {
+    const el = document.getElementById('teamCodeDisplay');
+    if (el) el.textContent = foundCode;
+  }
+});
 
-          let html = `<div class="admin-title">👑 Team Admin</div>`;
-          html += `<div style="background:var(--card); padding:8px 12px; border-radius:8px; margin-bottom:12px; text-align:center;">
-            <span style="color:var(--text-secondary); font-size:0.7rem;">🔑 Share this code with your team</span><br>
-            <span id="teamCodeDisplay" style="font-size:2rem; font-weight:bold; color:var(--accent2); letter-spacing:6px;">${codeDisplay}</span>
-          </div>`;
+// Fetch active route ID
+let activeRouteId = null;
+database.ref('teams/' + teamCode + '/activeRouteId').on('value', (snap) => {
+  activeRouteId = snap.val();
+  // Re-render the dropdown to highlight active
+  renderRouteDropdown();
+});
 
-          html += `<div class="route-controls">
-            <label>📂 Upload GPX Route</label>
-            <input type="file" id="gpxFileInput" accept=".gpx">
-            <button id="uploadRouteBtn" class="btn btn-outline btn-sm" style="width:100%; margin-top:4px;">⬆️ Upload Route</button>
-          </div>
-          <div class="route-controls">
-            <label>🗺️ Active Route (for whole team)</label>
-            <select id="routeSelector">
-              <option value="">-- None --</option>
-            </select>
-          </div>`;
+function renderRouteDropdown() {
+  const selector = document.getElementById('routeSelector');
+  if (!selector) return;
+  const routesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+  routesRef.once('value').then((snap) => {
+    const routes = snap.val();
+    const currentVal = selector.value;
+    selector.innerHTML = '<option value="">-- None --</option>';
+    if (routes) {
+      Object.keys(routes).forEach(id => {
+        const route = routes[id];
+        const opt = document.createElement('option');
+        opt.value = id;
+        let label = route.name || 'Unnamed Route';
+        if (id === activeRouteId) label += ' ✅ (Active)';
+        opt.textContent = label;
+        selector.appendChild(opt);
+      });
+    }
+    // Restore selected value
+    if (activeRouteId && routes && routes[activeRouteId]) {
+      selector.value = activeRouteId;
+    } else {
+      selector.value = '';
+    }
+  });
+}
 
-          const members = [];
-          for (const uid in remoteUsers) {
-            const u = remoteUsers[uid];
-            members.push({ id: uid, name: u.userName || 'Rider' });
+let html = `<div class="admin-title">👑 Team Admin</div>`;
+
+// Show 4-digit code
+html += `<div style="background:var(--card); padding:8px 12px; border-radius:8px; margin-bottom:12px; text-align:center;">
+  <span style="color:var(--text-secondary); font-size:0.7rem;">🔑 Share this code with your team</span><br>
+  <span id="teamCodeDisplay" style="font-size:2rem; font-weight:bold; color:var(--accent2); letter-spacing:6px;">${codeDisplay}</span>
+</div>`;
+
+// Route Management
+html += `<div class="route-controls">
+  <label>📂 Upload GPX Route (max 5)</label>
+  <input type="file" id="gpxFileInput" accept=".gpx">
+  <button id="uploadRouteBtn" class="btn btn-outline btn-sm" style="width:100%; margin-top:4px;">⬆️ Upload Route</button>
+</div>
+<div class="route-controls">
+  <label>🗺️ Active Route</label>
+  <select id="routeSelector">
+    <option value="">-- None --</option>
+  </select>
+</div>
+<div id="savedRoutesList" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+  <div style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:4px;">Saved Routes (max 5):</div>
+  <div id="routeListItems"></div>
+</div>`;
+
+// ... (member list, kick buttons, delete team button)
+
+$adminPanel.innerHTML = html;
+
+// ---- Attach Leader Events ----
+// Upload Route
+const uploadBtn = document.getElementById('uploadRouteBtn');
+const fileInput = document.getElementById('gpxFileInput');
+if (uploadBtn && fileInput) {
+  uploadBtn.onclick = function() {
+    uploadRoute(fileInput.files[0]);
+  };
+}
+
+// Route Selector change (set active route)
+const selector = document.getElementById('routeSelector');
+if (selector) {
+  selector.onchange = function() {
+    database.ref('teams/' + teamCode + '/activeRouteId').set(this.value);
+  };
+}
+
+// Render the route list with delete buttons
+function renderRouteList() {
+  const container = document.getElementById('routeListItems');
+  if (!container) return;
+  const routesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+  routesRef.once('value').then((snap) => {
+    const routes = snap.val();
+    if (!routes) {
+      container.innerHTML = '<div style="color:var(--text-secondary); font-size:0.7rem;">No routes saved.</div>';
+      return;
+    }
+    let html = '';
+    Object.keys(routes).forEach(id => {
+      const route = routes[id];
+      const isActive = (id === activeRouteId);
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:0.8rem;">${escapeHtml(route.name || 'Unnamed')} ${isActive ? '⭐' : ''}</span>
+        <button class="delete-route-btn admin-btn" data-id="${id}" data-name="${escapeHtml(route.name || 'Unnamed')}" style="border-color:var(--danger); color:var(--danger);">Delete</button>
+      </div>`;
+    });
+    container.innerHTML = html;
+
+    // Attach delete events
+    container.querySelectorAll('.delete-route-btn').forEach(btn => {
+      btn.onclick = function(e) {
+        e.stopPropagation();
+        const id = this.dataset.id;
+        const name = this.dataset.name;
+        if (!confirm(`Delete route "${name}"?`)) return;
+        // Remove from Firebase
+        const routeRef = database.ref('teams/' + teamCode + '/savedRoutes/' + id);
+        routeRef.remove().then(() => {
+          showToast(`🗑️ Route "${name}" deleted.`);
+          // If this was the active route, clear activeRouteId
+          if (activeRouteId === id) {
+            database.ref('teams/' + teamCode + '/activeRouteId').set(null);
           }
-          if (members.length > 0) {
-            html += `<div style="margin-top:10px; border-top:1px solid var(--border); padding-top:8px;">
-              <div style="margin-bottom:6px; font-size:0.75rem; color:var(--text-secondary);">Kick a member:</div>`;
-            members.forEach(m => {
-              html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
-                <span style="font-size:0.8rem;">${escapeHtml(m.name)}</span>
-                <button class="admin-btn" data-uid="${m.id}" data-name="${escapeHtml(m.name)}">Kick</button>
-              </div>`;
-            });
-            html += `</div>`;
-          } else {
-            html += `<div style="color:var(--text-secondary); font-size:0.7rem; margin-top:8px;">No other members.</div>`;
-          }
-          html += `<div style="margin-top:10px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🗑️ Delete Entire Team</button></div>`;
-          $adminPanel.innerHTML = html;
+          renderRouteList();
+          renderRouteDropdown();
+        }).catch(err => showToast('❌ Delete failed: ' + err.message, true));
+      };
+    });
+  });
+}
 
-          const uploadBtn = document.getElementById('uploadRouteBtn');
-          const fileInput = document.getElementById('gpxFileInput');
-          if (uploadBtn && fileInput) {
-            uploadBtn.onclick = function() {
-              uploadRoute(fileInput.files[0]);
-            };
-          }
+// Initial render of route list & dropdown
+renderRouteDropdown();
+renderRouteList();
 
-          const selector = document.getElementById('routeSelector');
-          if (selector) {
-            selector.onchange = function() {
-              database.ref('teams/' + teamCode + '/activeRouteId').set(this.value);
-            };
-          }
-
-          $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
-            btn.onclick = (e) => {
-              e.stopPropagation();
-              const uid = btn.dataset.uid;
-              const name = btn.dataset.name;
-              kickUser(uid, name);
-            };
-          });
-          const delBtn = document.getElementById('deleteTeamBtn');
-          if (delBtn) delBtn.onclick = deleteTeam;
-
-        } else {
-          $adminPanel.style.display = 'block';
-          $adminPanel.innerHTML = `
-            <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
-              <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🚪 Leave Team</button>
-            </div>
-          `;
-          document.getElementById('leaveTeamBtn')?.addEventListener('click', leaveTeam);
-        }
-      }
+// Re-render when routes change
+database.ref('teams/' + teamCode + '/savedRoutes').on('value', () => {
+  renderRouteList();
+  renderRouteDropdown();
+});
 
       window.highlightUser = function(uid) {
         if (uid === myUserId && myLastPosition) {
