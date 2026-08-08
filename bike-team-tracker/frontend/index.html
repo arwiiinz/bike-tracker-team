@@ -23,6 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
+    /* ===== ALL STYLES (unchanged) ===== */
     :root {
       --bg: #1a1a2e;
       --panel: #16213e;
@@ -166,9 +167,8 @@
     .toggle-sidebar { top: 10px; left: 10px; }
     .follow-btn { bottom: 100px; right: 14px; }
     .locate-btn { bottom: 44px; right: 14px; }
-    .manual-btn { bottom: 156px; right: 14px; }
-    .north-btn { bottom: 212px; right: 14px; }
-    .fix-marker-btn { bottom: 268px; right: 14px; font-size: 0.8rem; background: var(--accent); color: #fff; }
+    .north-btn { bottom: 156px; right: 14px; }
+    /* REMOVED: .manual-btn and .fix-marker-btn */
 
     .floating-panel {
       position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
@@ -225,7 +225,6 @@
       .toggle-sidebar { top: 8px; left: 8px; width: 40px; height: 40px; }
       .floating-panel { bottom: 10px; padding: 6px 14px; gap: 12px; border-radius: 24px; }
       .map-btn { width: 40px; height: 40px; font-size: 1.2rem; }
-      .fix-marker-btn { bottom: 220px; right: 14px; }
     }
     @media (max-width: 480px) {
       :root { --header-h: 44px; --sidebar-w: 260px; }
@@ -326,8 +325,7 @@
       <button class="map-btn north-btn" id="northBtn" title="Reset to North">🧭</button>
       <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
       <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
-      <button class="map-btn manual-btn" id="manualBtn" title="Set manual location">✏️</button>
-      <button class="map-btn fix-marker-btn" id="fixMarkerBtn" title="Fix Marker Position">🔧</button>
+      <!-- Removed manual-btn and fix-marker-btn -->
       
       <div id="map"></div>
       <div class="floating-panel" id="floatingPanel">
@@ -422,9 +420,9 @@
       const $myNameInput = document.getElementById('myNameInput');
       const $statusSelect = document.getElementById('statusSelect');
       const $btnManualLocation = document.getElementById('btnManualLocation');
-      const $manualBtn = document.getElementById('manualBtn');
       const $followBtn = document.getElementById('followBtn');
       const $locateBtn = document.getElementById('locateBtn');
+      const $northBtn = document.getElementById('northBtn');
 
       const $mySpeed = document.getElementById('mySpeed');
       const $myDistance = document.getElementById('myDistance');
@@ -697,6 +695,7 @@
         const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
         activeRouteRef.on('value', (snapshot) => {
           const activeId = snapshot.val();
+          // Remove old route layer if any
           if (routeLayerId && map) {
             try {
               if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
@@ -943,7 +942,7 @@
           mapInitialized = true;
           console.log('🗺️ Map loaded');
           
-          // ✅ Controls moved to top-right
+          // Controls at top-right
           map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
           
           const geolocateControl = new maplibregl.GeolocateControl({
@@ -968,7 +967,7 @@
             }
           });
 
-          // --- My Marker (Symbol Layer) ---
+          // My Marker (Symbol Layer)
           map.addSource(MY_MARKER_SOURCE, {
             type: 'geojson',
             data: {
@@ -993,7 +992,7 @@
             }
           });
 
-          // --- My Trail ---
+          // My Trail
           map.addSource(MY_TRAIL_SOURCE, {
             type: 'geojson',
             data: {
@@ -1181,23 +1180,6 @@
       }
 
       // ============================================================
-      // FORCE FIX MARKER
-      // ============================================================
-      function forceFixMarkers() {
-        if (!myLastPosition) {
-          showToast('⚠️ No position available. Set manual location first.', true);
-          return;
-        }
-        console.log('🔧 Force fixing marker to:', myLastPosition.lat, myLastPosition.lng);
-        updateMyMarker();
-        if (map) {
-          map.setCenter([myLastPosition.lng, myLastPosition.lat]);
-          map.setZoom(16);
-        }
-        showToast('✅ Marker position fixed!');
-      }
-
-      // ============================================================
       // GEOLOCATION
       // ============================================================
       function startGeolocation() {
@@ -1288,8 +1270,7 @@
         const alpha = event.alpha;
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
-          // ✅ FIXED: Invert the bearing so turning right = map turns right
-          updateMapBearing(360 - alpha);
+          updateMapBearing(360 - alpha); // Invert to correct direction
           console.log('🧭 Compass heading:', alpha.toFixed(1));
         }
       }
@@ -1616,7 +1597,8 @@
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
-              database.ref('teams/' + teamCode + '/activeRouteId').set(this.value);
+              const value = this.value;
+              database.ref('teams/' + teamCode + '/activeRouteId').set(value || null);
             };
           }
 
@@ -1812,24 +1794,14 @@
         }
       });
 
+      $northBtn.addEventListener('click', () => {
+        if (map) {
+          map.setBearing(0);
+          showToast('🧭 Map reset to North');
+        }
+      });
+
       $btnManualLocation.addEventListener('click', promptManualLocation);
-      $manualBtn.addEventListener('click', promptManualLocation);
-
-      const $northBtn = document.getElementById('northBtn');
-      if ($northBtn) {
-        $northBtn.addEventListener('click', () => {
-          if (map) {
-            map.setBearing(0);
-            showToast('🧭 Map reset to North');
-          }
-        });
-      }
-
-      const $fixMarkerBtn = document.getElementById('fixMarkerBtn');
-      if ($fixMarkerBtn) {
-        $fixMarkerBtn.addEventListener('click', forceFixMarkers);
-      }
-
       $btnStart.addEventListener('click', startTracking);
       $btnStop.addEventListener('click', stopTracking);
 
