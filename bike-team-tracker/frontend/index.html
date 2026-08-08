@@ -284,6 +284,17 @@
           <input type="text" id="myNameInput" placeholder="Your name" maxlength="20"
             style="flex:1; background:var(--card); border:1px solid var(--border); color:var(--text);
                    padding:8px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
+
+           <div style="margin-top:8px;">
+  <label style="font-size:0.7rem; color:var(--text-secondary);">🚴 Status</label>
+  <select id="statusSelect" style="width:100%; background:var(--card); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:20px; font-size:0.75rem; outline:none; font-family:inherit;">
+    <option value="🟢 All Good">🟢 All Good</option>
+    <option value="⚠️ Flat Tire">⚠️ Flat Tire</option>
+    <option value="⚠️ Chain Break">⚠️ Chain Break</option>
+    <option value="⚠️ Mechanical Issue">⚠️ Mechanical Issue</option>
+    <option value="🆘 Need Help">🆘 Need Help</option>
+  </select>
+</div>
         </div>
         <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
           📍 Set manual location
@@ -374,6 +385,7 @@
       let userTrailPolyline = null;
 
       // DOM refs
+         let myStatus = localStorage.getItem('biketeam_mystatus') || '🟢 All Good';
       const $sidebar = document.getElementById('sidebar');
       const $toggleSidebar = document.getElementById('toggleSidebar');
       const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
@@ -670,6 +682,7 @@
           timestamp: Date.now(),
           isTracking: isTracking,
           routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS)
+            status: myStatus
         };
         myLocationRef.set(data).catch((error) => {
           console.error('❌ Firebase write error:', error);
@@ -1031,6 +1044,7 @@
         members.push({
           id: myUserId,
           name: myName,
+           
           color: myColor,
           speed: myCurrentSpeed,
           distance: myTotalDistance,
@@ -1040,6 +1054,7 @@
           emoji: '🚴'
         });
         for (const uid in remoteUsers) {
+           const statusEmoji = m.status || '🟢';
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
           members.push({
@@ -1066,7 +1081,7 @@
               <div class="member-card${m.isYou ? ' you' : ''}${!m.isActive ? ' offline' : ''}" onclick="window.highlightUser('${m.id}')">
                 <div class="member-dot" style="background:${m.color};">${m.emoji}</div>
                 <div class="member-info">
-                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge}</div>
+                  <div class="member-name">${escapeHtml(m.name)} ${m.isYou ? '<span class="badge-you">YOU</span>' : ''} ${leaderBadge} <span style="font-size:0.8rem;">${statusEmoji}</span></div>
                   <div class="member-details"><span>⚡${m.speed.toFixed(1)} km/h</span><span>📏${m.distance.toFixed(2)} km</span></div>
                 </div>
                 <span class="member-status ${m.isActive ? 'status-active' : 'status-inactive'}">${m.isActive ? 'LIVE' : 'AWAY'}</span>
