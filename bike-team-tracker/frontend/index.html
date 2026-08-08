@@ -23,6 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
+    /* ===== YOUR EXISTING STYLES (unchanged) ===== */
     :root {
       --bg: #0a0a14;
       --panel: rgba(22, 33, 62, 0.85);
@@ -780,7 +781,6 @@
         const trimmed = teamName.trim();
         if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
 
-        // Check if name already exists
         try {
           const nameSnap = await database.ref('teams')
             .orderByChild('_meta/teamName')
@@ -1058,10 +1058,11 @@
             renderRouteList();
           });
 
-          // Active route listener (replaces, not adds)
+          // Active route listener – replaces the route
           const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
           activeRouteRef.on('value', (snapshot) => {
             const newActiveId = snapshot.val();
+
             // Remove old route
             if (routeLayerId && map) {
               try {
@@ -1071,18 +1072,20 @@
               routeLayerId = null;
               routeSourceId = null;
             }
+
             activeRouteId = newActiveId;
             renderRouteDropdown();
 
             if (!newActiveId) {
               showToast('🗺️ Route cleared.');
-              // Also clear start point if route cleared? We'll keep start as separate.
+              // Optionally clear start point? We keep start separate.
               return;
             }
 
+            // Draw new route
             database.ref('teams/' + teamCode + '/savedRoutes/' + newActiveId).once('value').then((snap) => {
               const route = snap.val();
-              if (route && route.points && route.points.length > 1 && map) {
+              if (route && route.points && route.points.length > 1 && map && mapInitialized) {
                 const geojson = {
                   type: 'Feature',
                   geometry: {
@@ -1125,7 +1128,7 @@
               startMarker.remove();
               startMarker = null;
             }
-            if (startData && startData.lat && startData.lng && map) {
+            if (startData && startData.lat && startData.lng && map && mapInitialized) {
               // Create a marker with a flag emoji
               const el = document.createElement('div');
               el.className = 'start-flag-marker';
@@ -1133,9 +1136,8 @@
               startMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
                 .setLngLat([startData.lng, startData.lat])
                 .addTo(map);
-              // Popup
               const popup = new maplibregl.Popup({ offset: [0, -10] })
-                .setHTML('<b>🏁 Start Point</b><br>Start your loop here.');
+                .setHTML('<b>🏁 Start Point</b>');
               startMarker.setPopup(popup);
               showToast('📍 Start point set!');
             }
@@ -1482,7 +1484,10 @@
 
       // ===== START POINT CONTROLS (Leader only) =====
       function setStartPoint() {
-        if (!isLeader) return;
+        if (!isLeader) {
+          showToast('Only the leader can set the start point.', true);
+          return;
+        }
         if (!activeRouteId) {
           showToast('Please select a route first.', true);
           return;
@@ -1507,7 +1512,10 @@
       }
 
       function clearStartPoint() {
-        if (!isLeader) return;
+        if (!isLeader) {
+          showToast('Only the leader can clear the start point.', true);
+          return;
+        }
         database.ref('teams/' + teamCode + '/startPoint').remove()
           .then(() => {
             showToast('🗑️ Start point cleared.');
