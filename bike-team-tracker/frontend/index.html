@@ -23,7 +23,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* ===== Your existing styles (unchanged) ===== */
     :root {
       --bg: #0a0a14;
       --panel: rgba(22, 33, 62, 0.85);
@@ -690,7 +689,11 @@
       const MY_TRAIL_LAYER = 'my-trail-layer';
 
       let remoteTrails = {};
+
+      // ---- ROUTE STATE ----
+      let routeSourceId = null;
       let routeLayerId = null;
+      let activeRouteId = null;
 
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
@@ -753,11 +756,28 @@
         });
       }
 
+      // ===== 🔥 FIXED: CREATE TEAM WITH NAME VALIDATION =====
       async function createTeam() {
         const teamName = prompt('👑 Enter a name for your new team (e.g., "Sunday Riders"):', 'My Team');
         if (!teamName) return false;
         const trimmed = teamName.trim();
         if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
+
+        // 🔥 CHECK IF TEAM NAME ALREADY EXISTS
+        try {
+          const nameSnap = await database.ref('teams')
+            .orderByChild('_meta/teamName')
+            .equalTo(trimmed)
+            .once('value');
+
+          if (nameSnap.exists()) {
+            showToast(`❌ Team name "${trimmed}" is already taken. Please choose another.`, true);
+            return false;
+          }
+        } catch (e) {
+          showToast('⚠️ Could not validate team name. Please try again.', true);
+          return false;
+        }
 
         let code = '';
         let attempts = 0;
@@ -1013,7 +1033,7 @@
           }
         });
 
-        // Routes
+        // ---- ROUTES ----
         if (teamCode !== 'openworld') {
           const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
           savedRoutesRef.on('value', () => {
@@ -1021,39 +1041,52 @@
             renderRouteList();
           });
 
-          // 🔥 FIXED: Active route listener – properly removes old route and adds new one
+          // 🔥 FIXED: Active route listener – replaces the route (not adds)
           const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
           activeRouteRef.on('value', (snapshot) => {
-            const activeId = snapshot.val();
+            const newActiveId = snapshot.val();
 
-            // Remove old route layer and source
+            // 1. Remove the OLD route completely
             if (routeLayerId && map) {
               try {
                 if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
-                if (map.getSource(routeLayerId)) map.removeSource(routeLayerId);
+                if (map.getSource(routeSourceId)) map.removeSource(routeSourceId);
               } catch (e) {
-                // Ignore errors if layer/source doesn't exist
+                // ignore
               }
               routeLayerId = null;
+              routeSourceId = null;
             }
 
-            // If there is a new active route, draw it
-            if (activeId) {
-              database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
-                const route = snap.val();
-                if (route && route.points && route.points.length > 1 && map) {
-                  const geojson = {
-                    type: 'Feature',
-                    geometry: {
-                      type: 'LineString',
-                      coordinates: route.points.map(p => [p[1], p[0]])
-                    }
-                  };
-                  const sourceId = 'route-' + activeId;
-                  routeLayerId = sourceId;
+            // 2. If newActiveId is null, just update the dropdown and clear the route
+            activeRouteId = newActiveId;
+            renderRouteDropdown();
+
+            if (!newActiveId) {
+              showToast('🗺️ Route cleared.');
+              return;
+            }
+
+            // 3. Draw the NEW route
+            database.ref('teams/' + teamCode + '/savedRoutes/' + newActiveId).once('value').then((snap) => {
+              const route = snap.val();
+              if (route && route.points && route.points.length > 1 && map) {
+                const geojson = {
+                  type: 'Feature',
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: route.points.map(p => [p[1], p[0]])
+                  }
+                };
+                const sourceId = 'route-source-' + newActiveId;
+                const layerId = 'route-layer-' + newActiveId;
+                routeSourceId = sourceId;
+                routeLayerId = layerId;
+
+                try {
                   map.addSource(sourceId, { type: 'geojson', data: geojson });
                   map.addLayer({
-                    id: 'route-layer-' + activeId,
+                    id: layerId,
                     type: 'line',
                     source: sourceId,
                     paint: {
@@ -1064,13 +1097,11 @@
                     }
                   });
                   showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
+                } catch (e) {
+                  showToast('⚠️ Error drawing route: ' + e.message, true);
                 }
-              });
-            } else {
-              showToast('🗺️ Route cleared.');
-            }
-            // Update dropdown to reflect current selection
-            renderRouteDropdown();
+              }
+            });
           });
         }
 
@@ -1347,7 +1378,7 @@
         return points;
       }
 
-      // ===== ROUTE UPLOAD (Manual – triggered by button click) =====
+      // ===== ROUTE UPLOAD (Manual) =====
       function uploadRoute(file) {
         if (!file) {
           showToast('Please select a GPX file.', true);
@@ -1758,8 +1789,6 @@
       }
 
       // ===== ROUTE UI =====
-      let activeRouteId = null;
-
       function renderRouteDropdown() {
         const selector = document.getElementById('routeSelector');
         if (!selector) return;
@@ -1818,6 +1847,7 @@
               const routeRef = database.ref('teams/' + teamCode + '/savedRoutes/' + id);
               routeRef.remove().then(() => {
                 showToast(`🗑️ Route "${name}" deleted.`);
+                // If the active route was deleted, clear it
                 if (activeRouteId === id) {
                   database.ref('teams/' + teamCode + '/activeRouteId').set(null);
                 }
@@ -1860,20 +1890,12 @@
             }
           });
 
-          // Fetch active route ID for dropdown highlighting
-          database.ref('teams/' + teamCode + '/activeRouteId').on('value', (snap) => {
-            activeRouteId = snap.val();
-            renderRouteDropdown();
-            renderRouteList();
-          });
-
           let html = `<div class="admin-title">👑 Team Admin</div>`;
           html += `<div style="background:var(--card);padding:6px 10px;border-radius:8px;margin-bottom:8px;text-align:center;">
             <span style="color:var(--text-secondary);font-size:0.55rem;">🔑 Team Code</span><br>
             <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
-          // Route management (manual upload)
           html += `<div class="route-controls">
             <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
@@ -1908,11 +1930,10 @@
           $adminPanel.innerHTML = html;
 
           // ---- Attach events ----
-          // Upload button: manual trigger
+          // Upload button
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
-            // Remove any old listeners by cloning
             const newBtn = uploadBtn.cloneNode(true);
             uploadBtn.parentNode.replaceChild(newBtn, uploadBtn);
             newBtn.onclick = function() {
@@ -1925,7 +1946,7 @@
             };
           }
 
-          // Route selector – changes active route
+          // Route selector
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
@@ -1946,7 +1967,7 @@
           renderRouteList();
 
         } else {
-          // Regular member view
+          // Regular member
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
             <div style="border-top:1px solid var(--border);padding-top:10px;">
