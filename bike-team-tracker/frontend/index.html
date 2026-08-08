@@ -698,28 +698,39 @@
         });
 
         // Listen for active route ID (shared across all users)
-        const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
-        activeRouteRef.on('value', (snapshot) => {
-          const activeId = snapshot.val();
-          routeLayerGroup.clearLayers();
-          if (activeId) {
-            database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
-              const route = snap.val();
-              if (route && route.points && route.points.length > 1) {
-                const polyline = L.polyline(route.points, { 
-                  color: '#ffd93d', 
-                  weight: 5, 
-                  opacity: 0.8, 
-                  dashArray: '10 6' 
-                });
-                polyline.addTo(routeLayerGroup);
-                // Optionally bind popup
-                polyline.bindPopup(`🗺️ ${route.name || 'Route'}`);
-                showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
-              }
-            });
-          }
+    // Listen for active route ID (shared across all users)
+const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
+activeRouteRef.on('value', (snapshot) => {
+  const activeId = snapshot.val();
+  routeLayerGroup.clearLayers();
+
+  // Update the dropdown if it exists (so the leader sees the selection)
+  const selector = document.getElementById('routeSelector');
+  if (selector && activeId) {
+    // Check if the option exists, if not, wait for routes to load
+    const optionExists = selector.querySelector(`option[value="${activeId}"]`);
+    if (optionExists) {
+      selector.value = activeId;
+    }
+  }
+
+  if (activeId) {
+    database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
+      const route = snap.val();
+      if (route && route.points && route.points.length > 1) {
+        const polyline = L.polyline(route.points, { 
+          color: '#ffd93d', 
+          weight: 5, 
+          opacity: 0.8, 
+          dashArray: '10 6' 
         });
+        polyline.addTo(routeLayerGroup);
+        polyline.bindPopup(`🗺️ ${route.name || 'Route'}`);
+        showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
+      }
+    });
+  }
+});
 
         // Stale user check
         setInterval(() => {
@@ -816,27 +827,30 @@
         return points;
       }
 
-      function uploadRoute(file) {
-        if (!file) { showToast('Please select a GPX file.', true); return; }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const gpxText = e.target.result;
-          const points = parseGPX(gpxText);
-          if (points.length < 2) {
-            showToast('Invalid GPX file or no track points.', true);
-            return;
-          }
-          const routeRef = database.ref('teams/' + teamCode + '/savedRoutes').push();
-          routeRef.set({
-            name: file.name.replace(/\.[^/.]+$/, ""),
-            points: points,
-            createdAt: Date.now()
-          }).then(() => {
-            showToast('✅ Route uploaded!');
-          }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
-        };
-        reader.readAsText(file);
-      }
+     function uploadRoute(file) {
+  if (!file) { showToast('Please select a GPX file.', true); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const gpxText = e.target.result;
+    const points = parseGPX(gpxText);
+    if (points.length < 2) {
+      showToast('Invalid GPX file or no track points.', true);
+      return;
+    }
+    const routeRef = database.ref('teams/' + teamCode + '/savedRoutes').push();
+    routeRef.set({
+      name: file.name.replace(/\.[^/.]+$/, ""),
+      points: points,
+      createdAt: Date.now()
+    }).then(() => {
+      showToast('✅ Route uploaded and activated!');
+      // 🚀 AUTO-ACTIVATE the route immediately
+      database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
+        .catch(err => showToast('⚠️ Route saved but failed to activate: ' + err.message, true));
+    }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
+  };
+  reader.readAsText(file);
+}
 
       // Leave team
       function leaveTeam() {
