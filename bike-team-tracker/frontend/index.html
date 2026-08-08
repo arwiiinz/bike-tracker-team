@@ -321,6 +321,9 @@
         <button class="btn btn-outline btn-sm" id="btnManualLocation" style="margin-top:8px; width:100%;">
           📍 Set manual location
         </button>
+        <button class="btn btn-outline btn-sm" id="btnEnableCompass" style="margin-top:4px; width:100%; border-color: var(--accent2);">
+  🧭 Enable Compass
+</button>
       </div>
       <div class="sidebar-section" style="flex:1; overflow-y:auto;">
         <h3>👥 Team (<span id="teamCount">0</span>)</h3>
@@ -1066,70 +1069,70 @@
       // ============================================================
 // 🧭 COMPASS / ORIENTATION (Rotate map based on phone facing)
 // ============================================================
-// ============================================================
+
+      // ============================================================
 // 🧭 COMPASS / ORIENTATION (Rotate map based on phone facing)
 // ============================================================
 let isOrientationActive = false;
-let compassLastUpdate = 0;
 
 function updateMapBearing(bearingDeg) {
   if (map && !isNaN(bearingDeg)) {
     map.setBearing(bearingDeg);
-    compassLastUpdate = Date.now();
-    // Optional: Show a tiny debug indicator in the console
-    // console.log('🧭 Bearing:', bearingDeg.toFixed(1));
   }
 }
 
 function handleDeviceOrientation(event) {
-  const alpha = event.alpha; // 0-360 degrees (compass heading)
+  const alpha = event.alpha; // 0-360 degrees
   if (alpha !== null && !isNaN(alpha)) {
     isOrientationActive = true;
     updateMapBearing(alpha);
-    
-    // 🔥 LOG TO CONSOLE (Remove this later if you want)
-    // This helps you verify the compass is working
-    console.log('🧭 Compass heading:', alpha.toFixed(1));
+    console.log('🧭 Compass heading:', alpha.toFixed(1)); // See in console
   }
 }
 
 function initOrientation() {
-  // Check if deviceorientation is available
   if (typeof DeviceOrientationEvent !== 'undefined') {
-    // iOS 13+ requires explicit permission
+    // iOS 13+ requires explicit permission via a user gesture
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      // 🔥 iOS: The user MUST tap a button, so we ask directly here
-      DeviceOrientationEvent.requestPermission()
-        .then(response => {
-          if (response === 'granted') {
-            window.addEventListener('deviceorientation', handleDeviceOrientation);
-            showToast('🧭 Compass enabled – map rotates with your phone!');
-            console.log('✅ iOS Compass permission granted.');
-          } else {
-            showToast('⚠️ Compass permission denied. Map will stay north-up.', true);
-            console.warn('⚠️ iOS Compass permission denied.');
-          }
-        })
-        .catch(err => console.warn('Orientation permission error:', err));
+      // We don't request here automatically – we let the button do it.
+      // But we attach the event listener if permission is already granted.
+      console.log('🍎 iOS: Tap "Enable Compass" button to activate.');
+      showToast('🍎 Tap "Enable Compass" button for map rotation.', false);
     } else {
-      // Android and older iOS
+      // Android / older iOS – attaches automatically
       window.addEventListener('deviceorientation', handleDeviceOrientation);
       showToast('🧭 Compass active – map rotates with your phone!');
       console.log('✅ Compass listener attached (Android/legacy).');
     }
   } else {
-    console.warn('❌ Device orientation not supported on this browser.');
-    showToast('⚠️ Compass not available. Using GPS direction (if moving).');
+    console.warn('❌ Device orientation not supported.');
+    showToast('⚠️ Compass not available.', true);
   }
+}
 
-  // Fallback: If we don't get any compass data after 5 seconds, notify the user
-  setTimeout(() => {
-    if (!isOrientationActive) {
-      console.warn('⏳ No compass data received after 5 seconds. Check sensor permissions.');
-      // Don't spam the user with a toast, just log it.
-    }
-  }, 5000);
-}      // ============================================================
+// This is called by the "Enable Compass" button
+function enableCompass() {
+  if (typeof DeviceOrientationEvent !== 'undefined' && 
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission()
+      .then(response => {
+        if (response === 'granted') {
+          window.addEventListener('deviceorientation', handleDeviceOrientation);
+          showToast('✅ Compass activated! Rotate your phone.');
+          document.getElementById('btnEnableCompass').style.display = 'none';
+          console.log('✅ iOS Compass permission granted.');
+        } else {
+          showToast('❌ Compass blocked. Please allow in browser settings.', true);
+          console.warn('⚠️ iOS Compass permission denied.');
+        }
+      })
+      .catch(err => console.warn('Orientation permission error:', err));
+  } else {
+    showToast('ℹ️ Compass already active or not supported.');
+  }
+}
+      
+      // ============================================================
       // 12. MANUAL LOCATION
       // ============================================================
       function setManualLocation(lat, lng) {
@@ -1573,7 +1576,10 @@ function initOrientation() {
       // 19. EVENT LISTENERS
       // ============================================================
 
-      const $compassBtn = document.getElementById('btnEnableCompass');
+     const $compassBtn = document.getElementById('btnEnableCompass');
+if ($compassBtn) {
+  $compassBtn.addEventListener('click', enableCompass);
+}
 if ($compassBtn) {
   $compassBtn.addEventListener('click', () => {
     if (typeof DeviceOrientationEvent !== 'undefined' && 
