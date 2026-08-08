@@ -675,9 +675,7 @@
         localStorage.setItem('biketeam_userid', myUserId);
       }
 
-      // ============================================================
-      // 🔥 TEAM CLEANUP CONFIG – Auto-delete after 5 minutes of inactivity
-      // ============================================================
+      // ===== TEAM CLEANUP =====
       const TEAM_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
       // ===== STATE =====
@@ -793,7 +791,7 @@
         });
       }
 
-      // ===== TEAM CREATION WITH NAME VALIDATION =====
+      // ===== TEAM CREATION =====
       async function createTeam() {
         const teamName = prompt('👑 Enter a name for your new team (e.g., "Sunday Riders"):', 'My Team');
         if (!teamName) return false;
@@ -839,7 +837,7 @@
           leaderName: leaderName,
           teamName: trimmed,
           createdAt: Date.now(),
-          lastActivity: Date.now()  // 🔥 Track when the team was last active
+          lastActivity: Date.now()
         };
         updates['teamCodes/' + code] = {
           teamCode: teamCodeClean,
@@ -885,7 +883,6 @@
         localStorage.setItem('biketeam_teamcode', teamCode);
         localStorage.removeItem('biketeam_isLeader');
 
-        // Update lastActivity when someone joins
         database.ref('teams/' + teamCode + '/_meta/lastActivity').set(Date.now());
 
         showToast(`✅ Joined team "${data.teamName || 'Unnamed'}"!`);
@@ -902,20 +899,14 @@
         startAppWithTeam();
       }
 
-      // ============================================================
-      // 🔥 TEAM CLEANUP – Delete team if inactive for too long
-      // ============================================================
+      // ===== TEAM CLEANUP =====
       function startTeamCleanup() {
         if (teamCleanupInterval) clearInterval(teamCleanupInterval);
-        // Check every 30 seconds
         teamCleanupInterval = setInterval(() => {
           if (!teamCode || teamCode === 'openworld') return;
 
-          // Check if the team still exists (meta)
           database.ref('teams/' + teamCode + '/_meta').once('value').then((snap) => {
             if (!snap.exists()) {
-              // Team already deleted
-              console.log('🔍 Team already deleted, stopping cleanup.');
               clearInterval(teamCleanupInterval);
               return;
             }
@@ -924,10 +915,7 @@
             const now = Date.now();
 
             if (now - lastActivity > TEAM_CLEANUP_TIMEOUT_MS) {
-              // Team has been inactive for too long – delete it
-              console.log(`🧹 Team "${teamCode}" inactive for ${(now - lastActivity)/1000} seconds. Deleting...`);
-
-              // Find the team code entry
+              console.log(`🧹 Team "${teamCode}" inactive. Deleting...`);
               database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((codeSnap) => {
                 const updates = {};
                 codeSnap.forEach((child) => {
@@ -940,7 +928,6 @@
                 localStorage.removeItem('biketeam_teamcode');
                 localStorage.removeItem('biketeam_isLeader');
                 if (teamCleanupInterval) clearInterval(teamCleanupInterval);
-                // Reload to show modal
                 setTimeout(() => { location.reload(); }, 1500);
               }).catch((err) => {
                 console.warn('⚠️ Failed to delete inactive team:', err);
@@ -949,7 +936,7 @@
           }).catch((err) => {
             console.warn('⚠️ Could not check team activity:', err);
           });
-        }, 30000); // Check every 30 seconds
+        }, 30000);
       }
 
       function updateTeamActivity() {
@@ -969,7 +956,6 @@
           $sidebarTitle.textContent = '🌍 Open World';
         } else {
           $sidebarTitle.textContent = '👥 Team Panel';
-          // Start cleanup for private teams
           startTeamCleanup();
         }
 
@@ -1062,7 +1048,6 @@
           renderClusters();
           updateTeamList();
           showToast(`👋 ${remoteUsers[snapshot.key]?.userName || 'Rider'} joined!`);
-          // Update activity when someone joins/changes
           updateTeamActivity();
         });
 
@@ -1078,7 +1063,6 @@
               localStorage.removeItem('biketeam_isLeader');
             }
             updateAdminPanel();
-            // Update activity when meta changes (e.g., lastActivity updated by someone)
             return;
           }
           if (remoteUsers[snapshot.key]) {
@@ -1088,7 +1072,6 @@
           }
           renderClusters();
           updateTeamList();
-          // Update activity when any rider updates
           updateTeamActivity();
         });
 
@@ -1263,7 +1246,6 @@
         myLocationRef.set(data).catch((error) => {
           showToast('❌ Firebase Error: ' + error.message, true);
         });
-        // Update team activity when we broadcast
         updateTeamActivity();
       }
 
@@ -1527,8 +1509,11 @@
         return points;
       }
 
-      // ===== ROUTE UPLOAD =====
+      // ============================================================
+      // 🔥 FIXED: ROUTE UPLOAD – Reliable, with proper event handling
+      // ============================================================
       function uploadRoute(file) {
+        console.log('📤 uploadRoute called with file:', file ? file.name : 'null');
         if (!file) {
           showToast('Please select a GPX file.', true);
           return;
@@ -1547,7 +1532,7 @@
             const points = parseGPX(gpxText);
 
             if (points.length < 2) {
-              showToast('Invalid GPX file or no track points.', true);
+              showToast('Invalid GPX file or no track points. Found: ' + points.length + ' points.', true);
               return;
             }
 
@@ -2072,7 +2057,9 @@
         });
       }
 
-      // ===== ADMIN PANEL =====
+      // ============================================================
+      // 🔥 FIXED: ADMIN PANEL – Upload button with reliable event binding
+      // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
           $adminPanel.style.display = 'none';
@@ -2109,6 +2096,7 @@
             <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
+          // ---- ROUTE UPLOAD SECTION ----
           html += `<div class="route-controls">
             <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
@@ -2123,6 +2111,7 @@
             <div id="routeListItems"></div>
           </div>`;
 
+          // ---- START POINT CONTROLS ----
           html += `<div class="start-controls">
             <label>🏁 Start Point</label>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -2131,6 +2120,7 @@
             </div>
           </div>`;
 
+          // Member kick list
           const members = [];
           for (const uid in remoteUsers) {
             const u = remoteUsers[uid];
@@ -2150,14 +2140,20 @@
           html += `<div style="margin-top:8px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🗑️ Delete Team</button></div>`;
           $adminPanel.innerHTML = html;
 
+          // ---- Attach events using a reliable approach ----
+          // Upload button: use a direct reference and attach once
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
+
           if (uploadBtn && fileInput) {
+            // Remove any existing listeners by replacing the button
             const newBtn = uploadBtn.cloneNode(true);
             uploadBtn.parentNode.replaceChild(newBtn, uploadBtn);
-            newBtn.onclick = function() {
+            // Attach fresh listener
+            newBtn.onclick = function(e) {
+              e.preventDefault();
               const input = document.getElementById('gpxFileInput');
-              if (input && input.files && input.files[0]) {
+              if (input && input.files && input.files.length > 0) {
                 uploadRoute(input.files[0]);
               } else {
                 showToast('Please select a GPX file first.', true);
@@ -2165,6 +2161,7 @@
             };
           }
 
+          // Route selector
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
@@ -2172,6 +2169,7 @@
             };
           }
 
+          // Start point buttons
           const setStartBtn = document.getElementById('setStartBtn');
           if (setStartBtn) {
             setStartBtn.onclick = setStartPoint;
@@ -2181,18 +2179,22 @@
             clearStartBtn.onclick = clearStartPoint;
           }
 
+          // Kick buttons
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
             btn.onclick = (e) => {
               e.stopPropagation();
               kickUser(btn.dataset.uid, btn.dataset.name);
             };
           });
-          document.getElementById('deleteTeamBtn')?.addEventListener('click', deleteTeam);
+
+          const deleteBtn = document.getElementById('deleteTeamBtn');
+          if (deleteBtn) deleteBtn.onclick = deleteTeam;
 
           renderRouteDropdown();
           renderRouteList();
 
         } else {
+          // Regular member
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
             <div style="border-top:1px solid var(--border);padding-top:10px;">
