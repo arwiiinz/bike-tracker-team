@@ -168,7 +168,6 @@
     .follow-btn { bottom: 100px; right: 14px; }
     .locate-btn { bottom: 44px; right: 14px; }
     .north-btn { bottom: 156px; right: 14px; }
-    /* REMOVED: .manual-btn and .fix-marker-btn */
 
     .floating-panel {
       position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
@@ -283,7 +282,7 @@
   <div class="main-container">
     <aside class="sidebar hidden" id="sidebar">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0;">
-        <h3 style="margin:0; font-size:1rem; color:var(--accent2);">👥 Team Panel</h3>
+        <h3 style="margin:0; font-size:1rem; color:var(--accent2);" id="sidebarTitle">👥 Team Panel</h3>
         <button id="closeSidebarBtn" style="background:none; border:none; color:var(--text); font-size:1.8rem; cursor:pointer; padding:0 8px; line-height:1;">✕</button>
       </div>
       <div class="sidebar-section">
@@ -314,7 +313,7 @@
         </button>
       </div>
       <div class="sidebar-section" style="flex:1; overflow-y:auto;">
-        <h3>👥 Team (<span id="teamCount">0</span>)</h3>
+        <h3>👥 Riders (<span id="teamCount">0</span>)</h3>
         <div class="team-list" id="teamList"></div>
         <div id="adminPanel" style="display:none;" class="admin-section"></div>
       </div>
@@ -325,7 +324,6 @@
       <button class="map-btn north-btn" id="northBtn" title="Reset to North">🧭</button>
       <button class="map-btn follow-btn" id="followBtn" title="Follow me">📍</button>
       <button class="map-btn locate-btn" id="locateBtn" title="My location">⊙</button>
-      <!-- Removed manual-btn and fix-marker-btn -->
       
       <div id="map"></div>
       <div class="floating-panel" id="floatingPanel">
@@ -407,6 +405,7 @@
 
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
+      const $sidebarTitle = document.getElementById('sidebarTitle');
       const $toggleSidebar = document.getElementById('toggleSidebar');
       const $closeSidebarBtn = document.getElementById('closeSidebarBtn');
       const $teamList = document.getElementById('teamList');
@@ -444,16 +443,21 @@
             <div class="modal-box">
               <h2>🚴 Join or Create Team</h2>
               <p style="text-align:center; color:var(--text-secondary); margin-bottom:12px; font-size:0.9rem;">
-                To start tracking, join an existing team or create your own.
+                Choose how you want to ride:
               </p>
               <div style="display:flex; flex-direction:column; gap:8px;">
-                <button id="modalCreateBtn" class="btn btn-start" style="width:100%;">✨ Create New Team</button>
-                <button id="modalJoinBtn" class="btn btn-outline" style="width:100%;">🔑 Join Existing Team</button>
+                <button id="modalOpenWorldBtn" class="btn btn-start" style="width:100%; background: var(--accent2);">🌍 Open World</button>
+                <button id="modalCreateBtn" class="btn btn-outline" style="width:100%;">✨ Create Private Team</button>
+                <button id="modalJoinBtn" class="btn btn-outline" style="width:100%;">🔑 Join Private Team</button>
               </div>
             </div>
           `;
           document.body.appendChild(overlay);
 
+          overlay.querySelector('#modalOpenWorldBtn').onclick = () => {
+            overlay.remove();
+            resolve('openworld');
+          };
           overlay.querySelector('#modalCreateBtn').onclick = () => {
             overlay.remove();
             resolve('create');
@@ -544,6 +548,16 @@
         return true;
       }
 
+      // 🌍 NEW: Open World Mode
+      function joinOpenWorld() {
+        teamCode = 'openworld';
+        isLeader = false;
+        localStorage.setItem('biketeam_teamcode', teamCode);
+        localStorage.removeItem('biketeam_isLeader');
+        showToast('🌍 Welcome to Open World! You see everyone who is here.');
+        startAppWithTeam();
+      }
+
       // ============================================================
       // START APP
       // ============================================================
@@ -554,6 +568,14 @@
         appStarted = true;
 
         console.log(`✅ Team: ${teamCode}, Leader: ${isLeader}`);
+        
+        // Update sidebar title based on mode
+        if (teamCode === 'openworld') {
+          $sidebarTitle.textContent = '🌍 Open World';
+        } else {
+          $sidebarTitle.textContent = '👥 Team Panel';
+        }
+
         initMap();
         initOrientation(); 
         $myNameInput.value = myName;
@@ -686,55 +708,57 @@
           updateTeamList();
         });
 
-        const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
-        savedRoutesRef.on('value', (snapshot) => {
-          renderRouteDropdown();
-          renderRouteList();
-        });
+        // Only set up route listeners for non-openworld (private teams)
+        if (teamCode !== 'openworld') {
+          const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+          savedRoutesRef.on('value', (snapshot) => {
+            renderRouteDropdown();
+            renderRouteList();
+          });
 
-        const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
-        activeRouteRef.on('value', (snapshot) => {
-          const activeId = snapshot.val();
-          // Remove old route layer if any
-          if (routeLayerId && map) {
-            try {
-              if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
-              if (map.getSource(routeLayerId)) map.removeSource(routeLayerId);
-            } catch(e) {}
-            routeLayerId = null;
-          }
-          if (activeId) {
-            database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
-              const route = snap.val();
-              if (route && route.points && route.points.length > 1 && map) {
-                const geojson = {
-                  type: 'Feature',
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: route.points.map(p => [p[1], p[0]])
-                  }
-                };
-                const sourceId = 'route-' + activeId;
-                routeLayerId = sourceId;
-                map.addSource(sourceId, { type: 'geojson', data: geojson });
-                map.addLayer({
-                  id: 'route-layer-' + activeId,
-                  type: 'line',
-                  source: sourceId,
-                  paint: {
-                    'line-color': '#ffd93d',
-                    'line-width': 5,
-                    'line-dasharray': [10, 6],
-                    'line-opacity': 0.8
-                  }
-                });
-                showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
-              }
-            });
-          }
-          // Refresh dropdown to show active route
-          renderRouteDropdown();
-        });
+          const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
+          activeRouteRef.on('value', (snapshot) => {
+            const activeId = snapshot.val();
+            // Remove old route layer if any
+            if (routeLayerId && map) {
+              try {
+                if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
+                if (map.getSource(routeLayerId)) map.removeSource(routeLayerId);
+              } catch(e) {}
+              routeLayerId = null;
+            }
+            if (activeId) {
+              database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
+                const route = snap.val();
+                if (route && route.points && route.points.length > 1 && map) {
+                  const geojson = {
+                    type: 'Feature',
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: route.points.map(p => [p[1], p[0]])
+                    }
+                  };
+                  const sourceId = 'route-' + activeId;
+                  routeLayerId = sourceId;
+                  map.addSource(sourceId, { type: 'geojson', data: geojson });
+                  map.addLayer({
+                    id: 'route-layer-' + activeId,
+                    type: 'line',
+                    source: sourceId,
+                    paint: {
+                      'line-color': '#ffd93d',
+                      'line-width': 5,
+                      'line-dasharray': [10, 6],
+                      'line-opacity': 0.8
+                    }
+                  });
+                  showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
+                }
+              });
+            }
+            renderRouteDropdown();
+          });
+        }
 
         setInterval(() => {
           const now = Date.now();
@@ -779,10 +803,10 @@
       }
 
       // ============================================================
-      // LEADER ACTIONS
+      // LEADER ACTIONS (only for private teams)
       // ============================================================
       function kickUser(userId, userName) {
-        if (!isLeader) return;
+        if (!isLeader || teamCode === 'openworld') return;
         if (userId === myUserId) return;
         if (!confirm(`Kick ${userName} from the team?`)) return;
         const userRef = database.ref('teams/' + teamCode + '/' + userId);
@@ -794,7 +818,7 @@
       }
 
       function deleteTeam() {
-        if (!isLeader) return;
+        if (!isLeader || teamCode === 'openworld') return;
         if (!confirm('⚠️ Are you sure you want to delete the entire team? This cannot be undone!')) return;
         const codeRef = database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode);
         codeRef.once('value').then((snap) => {
@@ -830,10 +854,11 @@
       }
 
       // ============================================================
-      // ROUTE UPLOAD (with 5-route limit)
+      // ROUTE UPLOAD (with 5-route limit) - Leaders only
       // ============================================================
       function uploadRoute(file) {
         if (!file) { showToast('Please select a GPX file.', true); return; }
+        if (teamCode === 'openworld') { showToast('Routes are not available in Open World.', true); return; }
         
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -868,19 +893,19 @@
 
       function leaveTeam() {
         if (!teamCode) return;
-        if (isLeader) {
+        if (isLeader && teamCode !== 'openworld') {
           showToast('👑 You are the leader. Use "Delete Team" to remove everyone, or transfer leadership first.', true);
           return;
         }
-        if (!confirm(`Are you sure you want to leave the team?`)) return;
+        if (!confirm(`Are you sure you want to leave ${teamCode === 'openworld' ? 'Open World' : 'the team'}?`)) return;
         const userRef = database.ref('teams/' + teamCode + '/' + myUserId);
         userRef.remove().then(() => {
-          showToast('👋 You have left the team.');
+          showToast(`👋 You have left ${teamCode === 'openworld' ? 'Open World' : 'the team'}.`);
           localStorage.removeItem('biketeam_teamcode');
           localStorage.removeItem('biketeam_isLeader');
           location.reload();
         }).catch((e) => {
-          showToast('❌ Error leaving team: ' + e.message, true);
+          showToast('❌ Error leaving: ' + e.message, true);
         });
       }
 
@@ -907,7 +932,7 @@
               }
             });
             if (taken) {
-              showToast(`❌ Username "${trimmed}" is already taken in this team!`, true);
+              showToast(`❌ Username "${trimmed}" is already taken!`, true);
               $myNameInput.value = myName;
               return false;
             } else {
@@ -942,7 +967,6 @@
           mapInitialized = true;
           console.log('🗺️ Map loaded');
           
-          // Controls at top-right
           map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
           
           const geolocateControl = new maplibregl.GeolocateControl({
@@ -1270,7 +1294,7 @@
         const alpha = event.alpha;
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
-          updateMapBearing(360 - alpha); // Invert to correct direction
+          updateMapBearing(360 - alpha);
           console.log('🧭 Compass heading:', alpha.toFixed(1));
         }
       }
@@ -1421,7 +1445,7 @@
         $teamCount.textContent = members.length - 1;
 
         if (members.length <= 1) {
-          $teamList.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders in "${teamCode}"...</div>`;
+          $teamList.innerHTML = `<div style="color:var(--text-secondary);font-size:0.8rem;padding:20px;text-align:center;">Waiting for riders${teamCode === 'openworld' ? ' in Open World' : ` in "${teamCode}"`}...</div>`;
         } else {
           $teamList.innerHTML = members.map(m => {
             const leaderBadge = (m.id === myUserId && isLeader) ? '<span class="badge-leader">👑 LEADER</span>' : '';
@@ -1441,7 +1465,7 @@
       }
 
       // ============================================================
-      // ROUTE DROPDOWN & LIST (for leader)
+      // ROUTE DROPDOWN & LIST (for leader, private teams only)
       // ============================================================
       let activeRouteId = null;
 
@@ -1519,8 +1543,20 @@
           return;
         }
 
+        // Open World: only show "Leave Open World" button
+        if (teamCode === 'openworld') {
+          $adminPanel.style.display = 'block';
+          $adminPanel.innerHTML = `
+            <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
+              <button id="leaveTeamBtn" class="btn btn-danger btn-sm" style="width:100%;">🚪 Leave Open World</button>
+            </div>
+          `;
+          document.getElementById('leaveTeamBtn')?.addEventListener('click', leaveTeam);
+          return;
+        }
+
         if (isLeader) {
-          // ---- LEADER VIEW ----
+          // ---- LEADER VIEW (Private Team) ----
           $adminPanel.style.display = 'block';
           
           let codeDisplay = 'Loading...';
@@ -1613,12 +1649,11 @@
           const delBtn = document.getElementById('deleteTeamBtn');
           if (delBtn) delBtn.onclick = deleteTeam;
 
-          // Initial renders
           renderRouteDropdown();
           renderRouteList();
 
         } else {
-          // ---- REGULAR MEMBER VIEW ----
+          // ---- REGULAR MEMBER VIEW (Private Team) ----
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
             <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
@@ -1866,6 +1901,16 @@
       // ============================================================
       async function init() {
         let storedTeamCode = localStorage.getItem('biketeam_teamcode');
+
+        // Handle Open World special case
+        if (storedTeamCode === 'openworld') {
+          teamCode = storedTeamCode;
+          isLeader = false;
+          localStorage.removeItem('biketeam_isLeader');
+          startAppWithTeam();
+          return;
+        }
+
         if (storedTeamCode) {
           const metaSnap = await database.ref('teams/' + storedTeamCode + '/_meta').once('value');
           if (metaSnap.exists()) {
@@ -1899,9 +1944,11 @@
           await createTeam();
         } else if (choice === 'join') {
           await joinTeam();
+        } else if (choice === 'openworld') {
+          joinOpenWorld();
         }
         if (!teamCode) {
-          showToast('Team selection failed. Please refresh.', true);
+          showToast('Selection failed. Please refresh.', true);
           location.reload();
         }
       }
