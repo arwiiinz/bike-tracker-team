@@ -73,7 +73,9 @@
     .header .logo { font-size: 1.2rem; font-weight: 700; white-space: nowrap; letter-spacing: -0.5px; }
     .header .logo span { color: var(--accent2); }
     .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
       background: var(--success);
       flex-shrink: 0;
       animation: pulse-dot 1.8s infinite;
@@ -202,7 +204,9 @@
     .member-card.you { border-color: var(--accent2); box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); }
     .member-card.offline { opacity: 0.5; }
     .member-dot {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -377,7 +381,7 @@
 
     #controls-overlay {
       position: absolute;
-      bottom: calc(env(safe-area-inset-bottom, 20px) + 100px);
+      bottom: 30%;
       left: 50%;
       transform: translateX(-50%);
       z-index: 500;
@@ -495,7 +499,7 @@
       #stats-overlay { top: 8px; padding: 8px 16px; gap: 14px; min-width: 160px; border-radius: 12px; }
       #stats-overlay .stat-value { font-size: 1.1rem; }
       #stats-overlay .stat-label { font-size: 0.45rem; }
-      #controls-overlay { bottom: calc(env(safe-area-inset-bottom, 20px) + 80px); }
+      #controls-overlay { bottom: 30%; }
       #controls-overlay .btn { font-size: 1rem; padding: 12px 28px; min-height: 50px; min-width: 110px; }
       .modal-box { padding: 20px 16px; }
       .modal-box h2 { font-size: 1.2rem; }
@@ -509,7 +513,7 @@
       #stats-overlay { gap: 10px; padding: 6px 12px; min-width: 130px; top: 6px; }
       #stats-overlay .stat-value { font-size: 0.9rem; }
       #stats-overlay .divider { height: 18px; }
-      #controls-overlay { bottom: calc(env(safe-area-inset-bottom, 20px) + 70px); }
+      #controls-overlay { bottom: 25%; }
       #controls-overlay .btn { font-size: 0.85rem; padding: 10px 20px; min-height: 44px; min-width: 90px; }
       .member-card { padding: 6px 10px; min-height: 40px; }
       .member-dot { width: 28px; height: 28px; font-size: 0.9rem; }
@@ -551,7 +555,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <button class="btn btn-outline btn-sm" id="btnEnableCompass" style="border-color: var(--accent2);">🧭 Compass</button>
+    <!-- 🧭 Compass button removed from header -->
   </header>
 
   <div class="main-container">
@@ -705,7 +709,6 @@
       const $followBtn = document.getElementById('followBtn');
       const $locateBtn = document.getElementById('locateBtn');
       const $northBtn = document.getElementById('northBtn');
-      const $compassBtn = document.getElementById('btnEnableCompass');
 
       const $mySpeed = document.getElementById('mySpeed');
       const $myDistance = document.getElementById('myDistance');
@@ -1563,7 +1566,7 @@
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
           if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            showToast('🍎 Tap "Compass" button for map rotation.', false);
+            showToast('🍎 Tap "North" button to enable compass rotation.', false);
           } else {
             window.addEventListener('deviceorientation', handleDeviceOrientation);
             showToast('🧭 Compass active – map rotates with your phone!');
@@ -1574,22 +1577,8 @@
       }
 
       function enableCompass() {
-        if (typeof DeviceOrientationEvent !== 'undefined' &&
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission()
-            .then(response => {
-              if (response === 'granted') {
-                window.addEventListener('deviceorientation', handleDeviceOrientation);
-                showToast('✅ Compass activated! Rotate your phone.');
-                $compassBtn.style.display = 'none';
-              } else {
-                showToast('❌ Compass blocked. Please allow in browser settings.', true);
-              }
-            })
-            .catch(() => {});
-        } else {
-          showToast('ℹ️ Compass already active or not supported.');
-        }
+        // This function is no longer needed – compass is always active but only rotates when tracking.
+        // The "North" button resets bearing to 0.
       }
 
       // ===== HELPERS =====
@@ -1897,7 +1886,6 @@
 
         // 🧭 Resume compass rotation immediately
         if (isOrientationActive && map) {
-          // Apply the last known compass bearing
           if (lastCompassBearing !== 0) {
             updateMapBearing(lastCompassBearing);
           }
@@ -1943,12 +1931,34 @@
         showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
       }
 
+      // ============================================================
+      // 🔥 FIXED: Toast messages no longer overlap
+      // Each new toast replaces the previous one
+      // ============================================================
+      let currentToast = null;
+
       function showToast(msg, isError = false) {
+        // Remove existing toast if any
+        if (currentToast && currentToast.parentNode) {
+          currentToast.remove();
+          currentToast = null;
+        }
+
         const toast = document.createElement('div');
         toast.className = 'toast' + (isError ? ' error' : '');
         toast.textContent = msg;
         $toastContainer.appendChild(toast);
-        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
+        currentToast = toast;
+
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+            if (currentToast === toast) {
+              currentToast = null;
+            }
+          }
+        }, 3000);
       }
 
       function escapeHtml(s) {
@@ -2002,7 +2012,6 @@
       }
 
       // ===== EVENT LISTENERS =====
-      $compassBtn.addEventListener('click', enableCompass);
 
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
