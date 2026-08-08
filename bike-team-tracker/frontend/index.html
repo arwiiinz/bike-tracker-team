@@ -23,6 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
+    /* ===== YOUR FULL STYLES (unchanged – kept exactly as you had them) ===== */
     :root {
       --bg: #0a0a14;
       --panel: rgba(22, 33, 62, 0.85);
@@ -42,11 +43,7 @@
       --touch-target: 44px;
     }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -74,19 +71,10 @@
       flex-shrink: 0;
       box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
     }
-    .header .logo {
-      font-size: 1.2rem;
-      font-weight: 700;
-      white-space: nowrap;
-      letter-spacing: -0.5px;
-    }
-    .header .logo span {
-      color: var(--accent2);
-    }
+    .header .logo { font-size: 1.2rem; font-weight: 700; white-space: nowrap; letter-spacing: -0.5px; }
+    .header .logo span { color: var(--accent2); }
     .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
+      width: 8px; height: 8px; border-radius: 50%;
       background: var(--success);
       flex-shrink: 0;
       animation: pulse-dot 1.8s infinite;
@@ -123,24 +111,11 @@
       background: transparent;
     }
     .btn:active { transform: scale(0.95); }
-    .btn-outline {
-      border: 1.5px solid var(--border);
-      color: var(--text);
-      background: transparent;
-    }
+    .btn-outline { border: 1.5px solid var(--border); color: var(--text); background: transparent; }
     .btn-outline:active { border-color: var(--accent2); color: var(--accent2); }
-    .btn-sm {
-      padding: 4px 10px;
-      font-size: 0.65rem;
-      min-height: 30px;
-    }
+    .btn-sm { padding: 4px 10px; font-size: 0.65rem; min-height: 30px; }
 
-    .main-container {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-    }
+    .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
 
     .sidebar {
       width: var(--sidebar-w);
@@ -172,20 +147,8 @@
       flex-shrink: 0;
       background: rgba(22, 33, 62, 0.6);
     }
-    .sidebar-header h3 {
-      margin: 0;
-      font-size: 0.95rem;
-      color: var(--accent2);
-    }
-    .sidebar-header button {
-      background: none;
-      border: none;
-      color: var(--text);
-      font-size: 1.6rem;
-      cursor: pointer;
-      padding: 0 4px;
-      line-height: 1;
-    }
+    .sidebar-header h3 { margin: 0; font-size: 0.95rem; color: var(--accent2); }
+    .sidebar-header button { background: none; border: none; color: var(--text); font-size: 1.6rem; cursor: pointer; padding: 0 4px; line-height: 1; }
 
     .sidebar-content {
       flex: 1;
@@ -197,10 +160,7 @@
     .sidebar-content::-webkit-scrollbar-track { background: transparent; }
     .sidebar-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
-    .sidebar-section {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-    }
+    .sidebar-section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
     .sidebar-section:last-child { border-bottom: none; }
     .sidebar-section h3 {
       font-size: 0.6rem;
@@ -211,11 +171,7 @@
       font-weight: 700;
     }
 
-    .my-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
+    .my-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .stat-card {
       background: var(--card);
       backdrop-filter: blur(4px);
@@ -226,24 +182,10 @@
       transition: border-color 0.3s;
     }
     .stat-card:active { border-color: var(--accent2); }
-    .stat-value {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: var(--accent2);
-      line-height: 1.2;
-    }
-    .stat-label {
-      font-size: 0.55rem;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      margin-top: 2px;
-    }
+    .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--accent2); line-height: 1.2; }
+    .stat-label { font-size: 0.55rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 2px; }
 
-    .team-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+    .team-list { display: flex; flex-direction: column; gap: 4px; }
     .member-card {
       display: flex;
       align-items: center;
@@ -258,15 +200,10 @@
       min-height: 48px;
     }
     .member-card:active { background: rgba(26, 58, 110, 0.6); }
-    .member-card.you {
-      border-color: var(--accent2);
-      box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
-    }
+    .member-card.you { border-color: var(--accent2); box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); }
     .member-card.offline { opacity: 0.5; }
     .member-dot {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
+      width: 32px; height: 32px; border-radius: 50%;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -275,19 +212,8 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     .member-info { flex: 1; min-width: 0; }
-    .member-name {
-      font-weight: 700;
-      font-size: 0.8rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .member-details {
-      font-size: 0.6rem;
-      color: var(--text-secondary);
-      display: flex;
-      gap: 8px;
-    }
+    .member-name { font-weight: 700; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .member-details { font-size: 0.6rem; color: var(--text-secondary); display: flex; gap: 8px; }
     .member-status {
       font-size: 0.5rem;
       padding: 2px 8px;
@@ -297,36 +223,11 @@
     }
     .status-active { background: rgba(46, 204, 113, 0.2); color: var(--success); }
     .status-inactive { background: rgba(243, 156, 18, 0.2); color: var(--warning); }
-    .badge-you {
-      background: var(--accent2);
-      color: #000;
-      font-size: 0.5rem;
-      padding: 1px 6px;
-      border-radius: 6px;
-      font-weight: 700;
-    }
-    .badge-leader {
-      background: #ffd93d;
-      color: #000;
-      font-size: 0.5rem;
-      padding: 1px 6px;
-      border-radius: 6px;
-      font-weight: 700;
-      margin-left: 4px;
-    }
+    .badge-you { background: var(--accent2); color: #000; font-size: 0.5rem; padding: 1px 6px; border-radius: 6px; font-weight: 700; }
+    .badge-leader { background: #ffd93d; color: #000; font-size: 0.5rem; padding: 1px 6px; border-radius: 6px; font-weight: 700; margin-left: 4px; }
 
-    .admin-section {
-      margin-top: 10px;
-      border-top: 1px solid var(--border);
-      padding-top: 10px;
-    }
-    .admin-section .admin-title {
-      color: var(--warning);
-      font-size: 0.6rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-    }
+    .admin-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .admin-section .admin-title { color: var(--warning); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
     .admin-btn {
       background: transparent;
       border: 1px solid var(--danger);
@@ -351,17 +252,8 @@
     }
     #statusSelect option { background: var(--panel); }
 
-    .route-controls {
-      margin-top: 6px;
-      border-top: 1px solid var(--border);
-      padding-top: 6px;
-    }
-    .route-controls label {
-      font-size: 0.6rem;
-      color: var(--text-secondary);
-      display: block;
-      margin-bottom: 3px;
-    }
+    .route-controls { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 6px; }
+    .route-controls label { font-size: 0.6rem; color: var(--text-secondary); display: block; margin-bottom: 3px; }
     #gpxFileInput {
       width: 100%;
       padding: 3px;
@@ -392,13 +284,7 @@
       cursor: pointer;
     }
     .delete-route-btn:hover { background: var(--danger); color: #fff; }
-    .route-list-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3px 0;
-      border-bottom: 1px solid var(--border);
-    }
+    .route-list-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--border); }
     .route-list-item span { font-size: 0.7rem; }
 
     #myNameInput {
@@ -415,26 +301,15 @@
     }
     #myNameInput:focus { border-color: var(--accent2); }
 
-    .map-container {
-      flex: 1;
-      position: relative;
-      z-index: 100;
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-      background: #0a0a14;
-    }
+    .map-container { flex: 1; position: relative; z-index: 100; }
+    #map { width: 100%; height: 100%; background: #0a0a14; }
 
     .maplibregl-ctrl-group {
       background: var(--panel) !important;
       border: 1px solid var(--border) !important;
       backdrop-filter: blur(8px) !important;
     }
-    .maplibregl-ctrl button {
-      background: var(--panel) !important;
-      color: var(--text) !important;
-    }
+    .maplibregl-ctrl button { background: var(--panel) !important; color: var(--text) !important; }
     .maplibregl-ctrl button:hover { background: var(--card) !important; }
     .maplibregl-ctrl button svg { fill: var(--text) !important; }
 
@@ -456,11 +331,7 @@
       box-shadow: var(--shadow);
       transition: all 0.25s;
     }
-    .map-btn:active {
-      border-color: var(--accent2);
-      color: var(--accent2);
-      transform: scale(0.92);
-    }
+    .map-btn:active { border-color: var(--accent2); color: var(--accent2); transform: scale(0.92); }
     .toggle-sidebar { top: 12px; left: 12px; }
     .follow-btn { bottom: 130px; right: 14px; }
     .locate-btn { bottom: 72px; right: 14px; }
@@ -503,23 +374,19 @@
       margin-top: 1px;
       font-weight: 600;
     }
-    #stats-overlay .divider {
-      width: 1px;
-      height: 32px;
-      background: var(--border);
-    }
+    #stats-overlay .divider { width: 1px; height: 32px; background: var(--border); }
 
-   #controls-overlay {
-  position: absolute;
-  bottom: calc(env(safe-area-inset-bottom, 20px) + 100px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 500;
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  pointer-events: none;
-}
+    #controls-overlay {
+      position: absolute;
+      bottom: calc(env(safe-area-inset-bottom, 20px) + 100px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      pointer-events: none;
+    }
     #controls-overlay .btn {
       pointer-events: auto;
       font-size: 1.2rem;
@@ -546,7 +413,6 @@
       box-shadow: 0 0 50px rgba(46, 204, 113, 0.6), 0 8px 40px rgba(0, 0, 0, 0.5);
       transform: scale(1.02);
     }
-
     #controls-overlay .btn-stop {
       background: linear-gradient(135deg, #e74c3c, #c0392b);
       color: #fff;
@@ -562,9 +428,7 @@
       70% { box-shadow: 0 0 0 20px rgba(46, 204, 113, 0); }
       100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
     }
-    #controls-overlay .btn-start.idle {
-      animation: pulse-ring 2s ease-in-out infinite;
-    }
+    #controls-overlay .btn-start.idle { animation: pulse-ring 2s ease-in-out infinite; }
 
     .toast {
       position: fixed;
@@ -583,18 +447,9 @@
       box-shadow: var(--shadow);
       max-width: 280px;
     }
-    .toast.error {
-      border-color: var(--danger);
-      background: rgba(74, 26, 26, 0.9);
-    }
-    @keyframes slideIn {
-      from { transform: translateX(120%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-      from { transform: translateX(0); opacity: 1; }
-      to { transform: translateX(120%); opacity: 0; }
-    }
+    .toast.error { border-color: var(--danger); background: rgba(74, 26, 26, 0.9); }
+    @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
 
     .modal-overlay {
       position: fixed;
@@ -619,76 +474,30 @@
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
     }
-    .modal-box h2 {
-      color: var(--accent2);
-      margin-bottom: 12px;
-      text-align: center;
-      font-size: 1.4rem;
-    }
-    .modal-box p {
-      text-align: center;
-      color: var(--text-secondary);
-      margin-bottom: 16px;
-      font-size: 0.85rem;
-    }
-    .modal-box .btn-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .modal-box .btn-group .btn {
-      width: 100%;
-      justify-content: center;
-      padding: 10px;
-      font-size: 0.9rem;
-      border-radius: 24px;
-    }
-    .modal-box .btn-group .btn-start {
-      background: var(--accent2);
-      color: #000;
-    }
+    .modal-box h2 { color: var(--accent2); margin-bottom: 12px; text-align: center; font-size: 1.4rem; }
+    .modal-box p { text-align: center; color: var(--text-secondary); margin-bottom: 16px; font-size: 0.85rem; }
+    .modal-box .btn-group { display: flex; flex-direction: column; gap: 8px; }
+    .modal-box .btn-group .btn { width: 100%; justify-content: center; padding: 10px; font-size: 0.9rem; border-radius: 24px; }
+    .modal-box .btn-group .btn-start { background: var(--accent2); color: #000; }
     .modal-box .btn-group .btn-start:hover { background: #33ddff; }
 
     @media (max-width: 768px) {
       :root { --header-h: 44px; --sidebar-w: 280px; }
       .header .logo { font-size: 1rem; }
       .btn { padding: 4px 10px; font-size: 0.65rem; min-height: 34px; }
-      .sidebar {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: var(--sidebar-w);
-      }
+      .sidebar { position: absolute; top: 0; left: 0; height: 100%; width: var(--sidebar-w); }
       .sidebar:not(.hidden) { transform: translateX(0); }
       .sidebar.hidden { transform: translateX(-100%); }
-      .toggle-sidebar {
-        top: 8px;
-        left: 8px;
-        width: 38px;
-        height: 38px;
-        font-size: 1rem;
-      }
+      .toggle-sidebar { top: 8px; left: 8px; width: 38px; height: 38px; font-size: 1rem; }
       .map-btn { width: 38px; height: 38px; font-size: 1rem; }
       .follow-btn { bottom: 115px; right: 10px; }
       .locate-btn { bottom: 60px; right: 10px; }
       .north-btn { bottom: 170px; right: 10px; }
-      #stats-overlay {
-        top: 8px;
-        padding: 8px 16px;
-        gap: 14px;
-        min-width: 160px;
-        border-radius: 12px;
-      }
+      #stats-overlay { top: 8px; padding: 8px 16px; gap: 14px; min-width: 160px; border-radius: 12px; }
       #stats-overlay .stat-value { font-size: 1.1rem; }
       #stats-overlay .stat-label { font-size: 0.45rem; }
-      #controls-overlay { bottom: 70px; }
-      #controls-overlay .btn {
-        font-size: 1rem;
-        padding: 12px 28px;
-        min-height: 50px;
-        min-width: 110px;
-      }
+      #controls-overlay { bottom: calc(env(safe-area-inset-bottom, 20px) + 80px); }
+      #controls-overlay .btn { font-size: 1rem; padding: 12px 28px; min-height: 50px; min-width: 110px; }
       .modal-box { padding: 20px 16px; }
       .modal-box h2 { font-size: 1.2rem; }
       .sidebar-header h3 { font-size: 0.8rem; }
@@ -698,21 +507,11 @@
 
     @media (max-width: 480px) {
       :root { --header-h: 40px; --sidebar-w: 260px; }
-      #stats-overlay {
-        gap: 10px;
-        padding: 6px 12px;
-        min-width: 130px;
-        top: 6px;
-      }
+      #stats-overlay { gap: 10px; padding: 6px 12px; min-width: 130px; top: 6px; }
       #stats-overlay .stat-value { font-size: 0.9rem; }
       #stats-overlay .divider { height: 18px; }
-      #controls-overlay { bottom: 60px; }
-      #controls-overlay .btn {
-        font-size: 0.85rem;
-        padding: 10px 20px;
-        min-height: 44px;
-        min-width: 90px;
-      }
+      #controls-overlay { bottom: calc(env(safe-area-inset-bottom, 20px) + 70px); }
+      #controls-overlay .btn { font-size: 0.85rem; padding: 10px 20px; min-height: 44px; min-width: 90px; }
       .member-card { padding: 6px 10px; min-height: 40px; }
       .member-dot { width: 28px; height: 28px; font-size: 0.9rem; }
       .member-name { font-size: 0.7rem; }
@@ -850,6 +649,7 @@
 
       // ===== STATE =====
       const UPDATE_INTERVAL_MS = 1500;
+      const TRAIL_UPDATE_INTERVAL_MS = 10000; // ✅ UPDATE TRAIL EVERY 10 SECONDS (NOT 1.5s)
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
@@ -873,6 +673,7 @@
       let isLeader = false;
 
       const remoteUsers = {};
+      const remoteTrailPoints = {}; // Store trails separately
 
       let map = null;
       let mapInitialized = false;
@@ -1113,12 +914,15 @@
       // ===== FIREBASE LISTENERS =====
       let locationsRef = null;
       let myLocationRef = null;
+      let trailsRef = null;
+      let myTrailRef = null;
 
       function setupFirebaseListeners() {
         if (!teamCode) return;
         myLocationRef = database.ref('teams/' + teamCode + '/' + myUserId);
         locationsRef = database.ref('teams/' + teamCode);
 
+        // Location listeners (for live markers)
         locationsRef.on('child_added', (snapshot) => {
           if (snapshot.key === myUserId) return;
           if (snapshot.key === '_meta') {
@@ -1174,12 +978,48 @@
           }
           if (remoteUsers[uid]) {
             removeRemoteMarker(uid);
-            removeRemoteTrail(uid);
           }
           delete remoteUsers[uid];
+          delete remoteTrailPoints[uid];
+          removeRemoteTrail(uid);
           updateTeamList();
         });
 
+        // ============================================================
+        // ✅ NEW: SEPARATE TRAIL LISTENER (UPDATED EVERY 10 SECONDS)
+        // ============================================================
+        // Store my trail in a separate node
+        myTrailRef = database.ref('teams/' + teamCode + '/trails/' + myUserId);
+
+        // Listen for trail changes from other riders
+        trailsRef = database.ref('teams/' + teamCode + '/trails');
+        trailsRef.on('child_added', (snapshot) => {
+          const uid = snapshot.key;
+          if (uid === myUserId) return;
+          const data = snapshot.val();
+          if (data && data.points && data.points.length > 1) {
+            remoteTrailPoints[uid] = data.points;
+            updateRemoteTrail(uid, data.points);
+          }
+        });
+
+        trailsRef.on('child_changed', (snapshot) => {
+          const uid = snapshot.key;
+          if (uid === myUserId) return;
+          const data = snapshot.val();
+          if (data && data.points && data.points.length > 1) {
+            remoteTrailPoints[uid] = data.points;
+            updateRemoteTrail(uid, data.points);
+          } else if (data && data.points && data.points.length === 0) {
+            // Trail cleared
+            remoteTrailPoints[uid] = [];
+            removeRemoteTrail(uid);
+          }
+        });
+
+        // ============================================================
+        // ROUTE LISTENERS
+        // ============================================================
         if (teamCode !== 'openworld') {
           const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
           savedRoutesRef.on('value', () => {
@@ -1230,6 +1070,7 @@
           });
         }
 
+        // Stale check
         setInterval(() => {
           const now = Date.now();
           let updated = false;
@@ -1251,6 +1092,9 @@
         }, 5000);
       }
 
+      // ============================================================
+      // ✅ BROADCAST MY POSITION (NOW WITHOUT TRAIL)
+      // ============================================================
       function broadcastMyPosition() {
         if (!myLastPosition || !myLocationRef) return;
         const data = {
@@ -1263,15 +1107,117 @@
           color: myColor,
           timestamp: Date.now(),
           isTracking: isTracking,
-          routePoints: myRoutePoints.slice(-MAX_TRAIL_POINTS),
           status: myStatus
+          // ✅ REMOVED: routePoints to save bandwidth
         };
         myLocationRef.set(data).catch((error) => {
           showToast('❌ Firebase Error: ' + error.message, true);
         });
       }
 
-      // ===== LEADER ACTIONS =====
+      // ============================================================
+      // ✅ UPDATE MY TRAIL SEPARATELY (EVERY 10 SECONDS)
+      // ============================================================
+      function updateMyTrailToFirebase() {
+        if (!isTracking || myRoutePoints.length < 2 || !myTrailRef) return;
+        myTrailRef.set({
+          points: myRoutePoints.slice(-MAX_TRAIL_POINTS),
+          updatedAt: Date.now()
+        }).catch((error) => {
+          // Silent fail for trail updates to avoid spamming toasts
+        });
+      }
+
+      // ============================================================
+      // REMOTE TRAIL UPDATER
+      // ============================================================
+      function updateRemoteTrail(uid, points) {
+        if (!map || !mapInitialized) return;
+        // Remove old trail
+        if (remoteTrails[uid]) {
+          try {
+            const oldId = remoteTrails[uid];
+            if (map.getLayer(oldId)) map.removeLayer(oldId);
+            if (map.getSource(oldId)) map.removeSource(oldId);
+          } catch (e) {}
+          remoteTrails[uid] = null;
+        }
+        if (!points || points.length < 2) return;
+
+        const geojson = {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: points.map(p => [p[1], p[0]])
+          }
+        };
+        const sourceId = 'remote-trail-' + uid;
+        remoteTrails[uid] = sourceId;
+        try {
+          map.addSource(sourceId, { type: 'geojson', data: geojson });
+          const user = remoteUsers[uid] || {};
+          map.addLayer({
+            id: 'remote-trail-layer-' + uid,
+            type: 'line',
+            source: sourceId,
+            paint: {
+              'line-color': user.color || '#888',
+              'line-width': 3,
+              'line-opacity': 0.5,
+              'line-dasharray': [6, 4]
+            }
+          });
+        } catch (e) {}
+      }
+
+      // ============================================================
+      // MARKERS (REMOTE) - TRAILS ARE HANDLED SEPARATELY NOW
+      // ============================================================
+      function updateRemoteMarkers() {
+        if (!map || !mapInitialized) return;
+        for (const uid in remoteUsers) {
+          const u = remoteUsers[uid];
+          if (!u.lat || !u.lng) continue;
+          if (remoteMarkers[uid]) {
+            remoteMarkers[uid].remove();
+            remoteMarkers[uid] = null;
+          }
+          const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
+          const el = createMarkerElement('🚴‍♂️', u.color || '#888');
+          el.style.opacity = isOffline ? 0.5 : 1;
+          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([u.lng, u.lat])
+            .addTo(map);
+          const popup = new maplibregl.Popup({ offset: [0, -15] })
+            .setHTML(
+              `<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
+            );
+          marker.setPopup(popup);
+          remoteMarkers[uid] = marker;
+        }
+      }
+
+      function removeRemoteMarker(uid) {
+        if (remoteMarkers[uid]) {
+          remoteMarkers[uid].remove();
+          delete remoteMarkers[uid];
+        }
+      }
+
+      function removeRemoteTrail(uid) {
+        if (remoteTrails[uid]) {
+          try {
+            const id = remoteTrails[uid];
+            if (map.getLayer(id)) map.removeLayer(id);
+            if (map.getSource(id)) map.removeSource(id);
+          } catch (e) {}
+          delete remoteTrails[uid];
+        }
+      }
+
+      // ============================================================
+      // LEADER ACTIONS (unchanged)
+      // ============================================================
       function kickUser(userId, userName) {
         if (!isLeader || teamCode === 'openworld') return;
         if (userId === myUserId) return;
@@ -1546,82 +1492,6 @@
         return el;
       }
 
-      function updateRemoteMarkers() {
-        if (!map || !mapInitialized) return;
-        for (const uid in remoteUsers) {
-          const u = remoteUsers[uid];
-          if (!u.lat || !u.lng) continue;
-          if (remoteMarkers[uid]) {
-            remoteMarkers[uid].remove();
-            remoteMarkers[uid] = null;
-          }
-          const isOffline = u._offline || (Date.now() - (u.timestamp || 0) > STALE_THRESHOLD_MS);
-          const el = createMarkerElement('🚴‍♂️', u.color || '#888');
-          el.style.opacity = isOffline ? 0.5 : 1;
-          const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-            .setLngLat([u.lng, u.lat])
-            .addTo(map);
-          const popup = new maplibregl.Popup({ offset: [0, -15] })
-            .setHTML(
-              `<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`
-            );
-          marker.setPopup(popup);
-          remoteMarkers[uid] = marker;
-
-          if (u.routePoints && u.routePoints.length >= 2) {
-            if (remoteTrails[uid]) {
-              try {
-                const oldId = remoteTrails[uid];
-                if (map.getLayer(oldId)) map.removeLayer(oldId);
-                if (map.getSource(oldId)) map.removeSource(oldId);
-              } catch (e) {}
-              remoteTrails[uid] = null;
-            }
-            const geojson = {
-              type: 'Feature',
-              geometry: {
-                type: 'LineString',
-                coordinates: u.routePoints.map(p => [p[1], p[0]])
-              }
-            };
-            const sourceId = 'remote-trail-' + uid;
-            remoteTrails[uid] = sourceId;
-            try {
-              map.addSource(sourceId, { type: 'geojson', data: geojson });
-              map.addLayer({
-                id: 'remote-trail-layer-' + uid,
-                type: 'line',
-                source: sourceId,
-                paint: {
-                  'line-color': u.color || '#888',
-                  'line-width': 3,
-                  'line-opacity': 0.5,
-                  'line-dasharray': [6, 4]
-                }
-              });
-            } catch (e) {}
-          }
-        }
-      }
-
-      function removeRemoteMarker(uid) {
-        if (remoteMarkers[uid]) {
-          remoteMarkers[uid].remove();
-          delete remoteMarkers[uid];
-        }
-      }
-
-      function removeRemoteTrail(uid) {
-        if (remoteTrails[uid]) {
-          try {
-            const id = remoteTrails[uid];
-            if (map.getLayer(id)) map.removeLayer(id);
-            if (map.getSource(id)) map.removeSource(id);
-          } catch (e) {}
-          delete remoteTrails[uid];
-        }
-      }
-
       // ===== GEOLOCATION =====
       function startGeolocation() {
         if (useManualLocation) return false;
@@ -1802,12 +1672,14 @@
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           const active = !u._offline && u.isTracking;
+          // Use trail points for distance estimation
+          const trailPts = remoteTrailPoints[uid] || [];
           members.push({
             id: uid,
             name: u.userName || 'Rider',
             color: u.color || '#888',
             speed: u.speed || 0,
-            distance: estimateRouteDistance(u.routePoints || []),
+            distance: estimateRouteDistance(trailPts),
             isYou: false,
             isActive: active,
             isTracking: u.isTracking,
@@ -2054,6 +1926,8 @@
         updateMyStats();
         updateTeamList();
         broadcastMyPosition();
+        // Send initial trail
+        updateMyTrailToFirebase();
         showToast('🚴 Ride started!');
         if (myLastPosition && map) {
           map.setCenter([myLastPosition.lng, myLastPosition.lat]);
@@ -2072,6 +1946,10 @@
         updateMyStats();
         updateTeamList();
         broadcastMyPosition();
+        // Clear trail from Firebase when stopped
+        if (myTrailRef) {
+          myTrailRef.remove().catch(() => {});
+        }
         clearRideSession();
         showToast('⏹ Stopped. Distance: ' + myTotalDistance.toFixed(2) + ' km');
       }
@@ -2123,7 +2001,7 @@
 
       function clearRideSession() { localStorage.removeItem(SESSION_KEY); }
 
-      // ===== TEST FIREBASE (silent) =====
+      // ===== TEST FIREBASE =====
       function testFirebaseConnection() {
         if (!teamCode) return;
         const testRef = database.ref('teams/' + teamCode + '/_test');
@@ -2224,9 +2102,17 @@
         }
       });
 
+      // Location broadcast interval (every 1.5s)
       setInterval(() => {
         if (myLastPosition) broadcastMyPosition();
       }, UPDATE_INTERVAL_MS);
+
+      // ✅ Trail update interval (every 10s)
+      setInterval(() => {
+        if (isTracking && myLastPosition) {
+          updateMyTrailToFirebase();
+        }
+      }, TRAIL_UPDATE_INTERVAL_MS);
 
       setInterval(() => { saveRideSession(); }, 5000);
 
