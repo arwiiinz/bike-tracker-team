@@ -23,6 +23,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
+    /* ===== Your existing styles (unchanged) ===== */
     :root {
       --bg: #0a0a14;
       --panel: rgba(22, 33, 62, 0.85);
@@ -1020,16 +1021,23 @@
             renderRouteList();
           });
 
+          // 🔥 FIXED: Active route listener – properly removes old route and adds new one
           const activeRouteRef = database.ref('teams/' + teamCode + '/activeRouteId');
           activeRouteRef.on('value', (snapshot) => {
             const activeId = snapshot.val();
+
+            // Remove old route layer and source
             if (routeLayerId && map) {
               try {
                 if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
                 if (map.getSource(routeLayerId)) map.removeSource(routeLayerId);
-              } catch (e) {}
+              } catch (e) {
+                // Ignore errors if layer/source doesn't exist
+              }
               routeLayerId = null;
             }
+
+            // If there is a new active route, draw it
             if (activeId) {
               database.ref('teams/' + teamCode + '/savedRoutes/' + activeId).once('value').then((snap) => {
                 const route = snap.val();
@@ -1058,7 +1066,10 @@
                   showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
                 }
               });
+            } else {
+              showToast('🗺️ Route cleared.');
             }
+            // Update dropdown to reflect current selection
             renderRouteDropdown();
           });
         }
@@ -1336,7 +1347,7 @@
         return points;
       }
 
-      // ===== ROUTE UPLOAD =====
+      // ===== ROUTE UPLOAD (Manual – triggered by button click) =====
       function uploadRoute(file) {
         if (!file) {
           showToast('Please select a GPX file.', true);
@@ -1849,6 +1860,7 @@
             }
           });
 
+          // Fetch active route ID for dropdown highlighting
           database.ref('teams/' + teamCode + '/activeRouteId').on('value', (snap) => {
             activeRouteId = snap.val();
             renderRouteDropdown();
@@ -1861,6 +1873,7 @@
             <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
+          // Route management (manual upload)
           html += `<div class="route-controls">
             <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
@@ -1894,10 +1907,12 @@
           html += `<div style="margin-top:8px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🗑️ Delete Team</button></div>`;
           $adminPanel.innerHTML = html;
 
-          // Attach events
+          // ---- Attach events ----
+          // Upload button: manual trigger
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
+            // Remove any old listeners by cloning
             const newBtn = uploadBtn.cloneNode(true);
             uploadBtn.parentNode.replaceChild(newBtn, uploadBtn);
             newBtn.onclick = function() {
@@ -1910,6 +1925,7 @@
             };
           }
 
+          // Route selector – changes active route
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
@@ -1917,6 +1933,7 @@
             };
           }
 
+          // Kick buttons
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
             btn.onclick = (e) => {
               e.stopPropagation();
@@ -1929,6 +1946,7 @@
           renderRouteList();
 
         } else {
+          // Regular member view
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
             <div style="border-top:1px solid var(--border);padding-top:10px;">
