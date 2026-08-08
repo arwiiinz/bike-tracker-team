@@ -1572,6 +1572,29 @@ function initOrientation() {
       // ============================================================
       // 19. EVENT LISTENERS
       // ============================================================
+
+      const $compassBtn = document.getElementById('btnEnableCompass');
+if ($compassBtn) {
+  $compassBtn.addEventListener('click', () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' && 
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(response => {
+          if (response === 'granted') {
+            window.addEventListener('deviceorientation', handleDeviceOrientation);
+            showToast('✅ Compass activated! Rotate your phone.');
+            $compassBtn.style.display = 'none';
+          } else {
+            showToast('❌ Compass blocked. Please allow in browser settings.', true);
+          }
+        });
+    } else {
+      showToast('ℹ️ Compass already active or not supported.');
+    }
+  });
+}
+
+      
       $toggleSidebar.addEventListener('click', () => {
         $sidebar.classList.toggle('hidden');
         if (window.innerWidth <= 768) {
