@@ -1295,14 +1295,14 @@
         }
       }
 
-      function handleDeviceOrientation(event) {
-        const alpha = event.alpha;
-        if (alpha !== null && !isNaN(alpha)) {
-          isOrientationActive = true;
-          updateMapBearing(alpha);
-          console.log('🧭 Compass heading:', alpha.toFixed(1));
-        }
-      }
+   function handleDeviceOrientation(event) {
+  const alpha = event.alpha;
+  if (alpha !== null && !isNaN(alpha)) {
+    isOrientationActive = true;
+    updateMapBearing(360 - alpha);  // ✅ Inverts the rotation correctly
+    console.log('🧭 Compass heading:', alpha.toFixed(1));
+  }
+}
 
       function initOrientation() {
         if (typeof DeviceOrientationEvent !== 'undefined') {
