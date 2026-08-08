@@ -1036,13 +1036,13 @@
         const el = createMarkerElement('🚴', myColor, true);
         el.title = `${myName} (You) - ${myCurrentSpeed.toFixed(1)} km/h`;
 
-        myMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat([lng, lat])
-          .addTo(map);
+    myMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+  .setLngLat([lng, lat])
+  .addTo(map);
 
-        const popup = new maplibregl.Popup({ offset: 25 })
-          .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
-        myMarker.setPopup(popup);
+const popup = new maplibregl.Popup({ offset: [0, -15] })
+  .setHTML(`<b>${escapeHtml(myName)}</b> (You)<br>Speed: ${myCurrentSpeed.toFixed(1)} km/h<br>${myStatus}`);
+myMarker.setPopup(popup);
       }
 
       // Update user trail
@@ -1107,13 +1107,13 @@
           const el = createMarkerElement('🚴‍♂️', u.color || '#888', false);
           el.style.opacity = isOffline ? 0.5 : 1;
 
-          const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-            .setLngLat([u.lng, u.lat])
-            .addTo(map);
+         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+  .setLngLat([u.lng, u.lat])
+  .addTo(map);
 
-          const popup = new maplibregl.Popup({ offset: 25 })
-            .setHTML(`<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
-          marker.setPopup(popup);
+const popup = new maplibregl.Popup({ offset: [0, -15] })
+  .setHTML(`<b>${escapeHtml(u.userName || 'Rider')}</b> ${u.status || '🟢'}<br>Speed: ${(u.speed || 0).toFixed(1)} km/h<br>${isOffline ? '🟠 Away' : '🟢 Active'}`);
+marker.setPopup(popup);
 
           remoteMarkers[uid] = marker;
 
