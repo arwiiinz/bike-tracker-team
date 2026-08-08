@@ -949,14 +949,14 @@
           console.log('🗺️ Map loaded');
           
           // --- Controls ---
-          map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right');
+          map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
           const geolocateControl = new maplibregl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true },
             trackUserLocation: true,
             showUserHeading: true,
             showAccuracyCircle: true
           });
-          map.addControl(geolocateControl, 'bottom-right');
+          map.addControl(geolocateControl, 'top-right');
 
           // --- Map events ---
           map.on('dragstart', () => { followMode = false; });
