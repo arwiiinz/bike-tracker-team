@@ -115,6 +115,8 @@
     .btn-outline { border: 1.5px solid var(--border); color: var(--text); background: transparent; }
     .btn-outline:active { border-color: var(--accent2); color: var(--accent2); }
     .btn-sm { padding: 4px 10px; font-size: 0.65rem; min-height: 30px; }
+    .btn-danger-outline { border: 1.5px solid var(--danger); color: var(--danger); background: transparent; }
+    .btn-danger-outline:hover { background: var(--danger); color: #fff; }
 
     .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
 
@@ -289,6 +291,9 @@
     .delete-route-btn:hover { background: var(--danger); color: #fff; }
     .route-list-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--border); }
     .route-list-item span { font-size: 0.7rem; }
+
+    .premade-section { margin-top: 8px; border-top: 2px solid var(--accent2); padding-top: 8px; }
+    .premade-section .premade-title { color: var(--accent2); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
 
     #myNameInput {
       flex: 2;
@@ -556,7 +561,6 @@
     <div class="status-dot" id="statusDot"></div>
     <span class="status-text" id="statusText">CONNECTING</span>
     <span class="spacer"></span>
-    <!-- Compass button removed -->
   </header>
 
   <div class="main-container">
@@ -630,6 +634,14 @@
 
   <script>
     (function() {
+      // ============================================================
+      // 🔥 PROGRAMMER ID – CHANGE THIS TO YOUR USER ID
+      // ============================================================
+      // To find your user ID: open the app, open console (F12), type:
+      // console.log(myUserId)
+      // Copy the value and paste it below.
+      const PROGRAMMER_ID = 'user_YOUR_USER_ID_HERE'; // Replace with your actual user ID
+
       // ===== FIREBASE CONFIG =====
       const firebaseConfig = {
         apiKey: "AIzaSyDQI0kkCJPNq-RYtzKhCEYS5sjQRcc5X0E",
@@ -650,13 +662,14 @@
         myUserId = 'user_' + Math.random().toString(36).substring(2, 10);
         localStorage.setItem('biketeam_userid', myUserId);
       }
+      // Show user ID in console for easy copy
+      console.log('🔥 Your User ID:', myUserId);
 
       // ===== STATE =====
       const UPDATE_INTERVAL_MS = 1500;
       const TRAIL_UPDATE_INTERVAL_MS = 10000;
       const STALE_THRESHOLD_MS = 20000;
       const MAX_TRAIL_POINTS = 300;
-      // 🔥 Cluster distance set to 50 meters (0.05 km)
       const CLUSTER_DISTANCE_KM = 0.05;
       const USER_COLORS = ['#00d2ff', '#ff6b6b', '#ffd93d', '#6bcb77', '#ff922b', '#845ef7', '#f06595', '#20c997', '#ff6b9d',
         '#4ecdc4', '#ffe66d', '#a29bfe'
@@ -685,10 +698,8 @@
       let mapInitialized = false;
       let followMode = true;
 
-      // Clustering markers
       let clusterMarkers = [];
 
-      // Trail layers
       const MY_TRAIL_SOURCE = 'my-trail-source';
       const MY_TRAIL_LAYER = 'my-trail-layer';
 
@@ -922,6 +933,7 @@
       let myLocationRef = null;
       let trailsRef = null;
       let myTrailRef = null;
+      let premadeRoutesRef = null;
 
       function setupFirebaseListeners() {
         if (!teamCode) return;
@@ -1016,7 +1028,19 @@
           }
         });
 
-        // Routes
+        // Premade routes listener
+        premadeRoutesRef = database.ref('premadeRoutes');
+        premadeRoutesRef.on('value', () => {
+          // Update admin panel when premade routes change
+          if (isLeader) {
+            updateAdminPanel();
+          }
+          if (myUserId === PROGRAMMER_ID) {
+            updateAdminPanel(); // programmer sees upload/delete controls
+          }
+        });
+
+        // Team routes
         if (teamCode !== 'openworld') {
           const savedRoutesRef = database.ref('teams/' + teamCode + '/savedRoutes');
           savedRoutesRef.on('value', () => {
@@ -1164,7 +1188,7 @@
         }
       }
 
-      // ===== CLUSTERING LOGIC =====
+      // ===== CLUSTERING =====
       function getClusters(riders) {
         const clusters = [];
         const used = new Set();
@@ -1182,7 +1206,6 @@
             if (dist < CLUSTER_DISTANCE_KM) {
               cluster.riders.push(riders[j]);
               used.add(j);
-              // Recompute centroid
               let sumLat = 0,
                 sumLng = 0;
               for (const r of cluster.riders) {
@@ -1198,16 +1221,12 @@
         return clusters;
       }
 
-      // ===== RENDER CLUSTERS (SELF REMOVED) =====
       function renderClusters() {
         if (!map || !mapInitialized) return;
 
-        // Collect riders (ONLY REMOTE USERS)
         const riders = [];
 
-        // 🔥 SELF IS REMOVED – YOU WILL NOT SEE YOURSELF ON THE MAP
-
-        // Add remote users with valid coordinates
+        // Add remote users only (skip self)
         for (const uid in remoteUsers) {
           const u = remoteUsers[uid];
           if (!u.lat || !u.lng) continue;
@@ -1227,57 +1246,45 @@
           });
         }
 
-        // If no riders, clear markers and return
         if (riders.length === 0) {
           for (const m of clusterMarkers) m.remove();
           clusterMarkers = [];
           return;
         }
 
-        // Compute clusters
         const clusters = getClusters(riders);
 
-        // Remove old markers
-        for (const m of clusterMarkers) {
-          m.remove();
-        }
+        for (const m of clusterMarkers) m.remove();
         clusterMarkers = [];
 
-        // Create new markers for each cluster
         for (const cluster of clusters) {
           const isCluster = cluster.riders.length > 1;
           const emoji = isCluster ? '🚴🚴' : '🚴';
-          // Use the first rider's color, or gold for clusters
           const color = isCluster ? '#ffd93d' : cluster.riders[0].color;
 
           const el = document.createElement('div');
-          // Add cluster class if it's a cluster
           el.className = 'custom-marker' + (isCluster ? ' cluster-marker' : '');
           el.style.backgroundColor = color;
           el.textContent = emoji;
-          if (isCluster) {
-            el.style.color = '#000';
-          }
+          if (isCluster) el.style.color = '#000';
 
           const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
             .setLngLat([cluster.lng, cluster.lat])
             .addTo(map);
 
-          // Build popup content
           let popupHTML = '';
           for (const r of cluster.riders) {
-            const statusEmoji = r.status || '🟢';
-            popupHTML += `<b>${escapeHtml(r.name)}</b> ${statusEmoji}<br>`;
+            popupHTML += `<b>${escapeHtml(r.name)}</b> ${r.status || '🟢'}<br>`;
           }
           if (isCluster) {
-            popupHTML += `<span style="font-size:0.7rem;color:var(--text-secondary);">${cluster.riders.length} riders together</span>`;
+            popupHTML +=
+              `<span style="font-size:0.7rem;color:var(--text-secondary);">${cluster.riders.length} riders together</span>`;
           } else {
             const r = cluster.riders[0];
             popupHTML += `Speed: ${(r.speed || 0).toFixed(1)} km/h`;
           }
 
-          const popup = new maplibregl.Popup({ offset: [0, -15] })
-            .setHTML(popupHTML);
+          const popup = new maplibregl.Popup({ offset: [0, -15] }).setHTML(popupHTML);
           marker.setPopup(popup);
 
           clusterMarkers.push(marker);
@@ -1318,11 +1325,20 @@
         });
       }
 
+      // ===== GPX PARSING =====
       function parseGPX(gpxString) {
         const parser = new DOMParser();
         const xml = parser.parseFromString(gpxString, 'text/xml');
-        const trkpts = xml.getElementsByTagName('trkpt');
         const points = [];
+
+        let trkpts = xml.getElementsByTagName('trkpt');
+        if (trkpts.length === 0) {
+          trkpts = xml.getElementsByTagName('rtept');
+        }
+        if (trkpts.length === 0) {
+          trkpts = xml.getElementsByTagName('wpt');
+        }
+
         for (let i = 0; i < trkpts.length; i++) {
           const lat = parseFloat(trkpts[i].getAttribute('lat'));
           const lon = parseFloat(trkpts[i].getAttribute('lon'));
@@ -1330,42 +1346,193 @@
             points.push([lat, lon]);
           }
         }
+
+        if (points.length === 0) {
+          const segments = xml.getElementsByTagName('trkseg');
+          for (let s = 0; s < segments.length; s++) {
+            const pts = segments[s].getElementsByTagName('trkpt');
+            for (let i = 0; i < pts.length; i++) {
+              const lat = parseFloat(pts[i].getAttribute('lat'));
+              const lon = parseFloat(pts[i].getAttribute('lon'));
+              if (!isNaN(lat) && !isNaN(lon)) {
+                points.push([lat, lon]);
+              }
+            }
+          }
+        }
+
         return points;
       }
 
+      // ===== ROUTE UPLOAD (Team route) =====
       function uploadRoute(file) {
-        if (!file) { showToast('Please select a GPX file.', true); return; }
-        if (teamCode === 'openworld') { showToast('Routes are not available in Open World.', true); return; }
+        if (!file) {
+          showToast('Please select a GPX file.', true);
+          return;
+        }
+        if (teamCode === 'openworld') {
+          showToast('Routes are not available in Open World.', true);
+          return;
+        }
+
+        showToast('⏳ Uploading route...', false);
 
         const reader = new FileReader();
         reader.onload = function(e) {
-          const gpxText = e.target.result;
-          const points = parseGPX(gpxText);
-          if (points.length < 2) {
-            showToast('Invalid GPX file or no track points.', true);
-            return;
-          }
+          try {
+            const gpxText = e.target.result;
+            const points = parseGPX(gpxText);
 
-          const routesRef = database.ref('teams/' + teamCode + '/savedRoutes');
-          routesRef.once('value').then((snap) => {
-            if (snap.numChildren() >= 5) {
-              showToast('⚠️ Maximum 5 routes per team. Delete an existing route first.', true);
+            if (points.length < 2) {
+              showToast('Invalid GPX file or no track points. Found: ' + points.length + ' points.', true);
               return;
             }
 
-            const routeRef = routesRef.push();
-            routeRef.set({
-              name: file.name.replace(/\.[^/.]+$/, ""),
-              points: points,
-              createdAt: Date.now()
-            }).then(() => {
-              showToast('✅ Route uploaded and activated!');
-              database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
-                .catch(() => showToast('⚠️ Route saved but failed to activate.', true));
-            }).catch(err => showToast('❌ Upload failed: ' + err.message, true));
-          });
+            const routesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+            routesRef.once('value').then((snap) => {
+              if (snap.numChildren() >= 5) {
+                showToast('⚠️ Maximum 5 routes per team. Delete an existing route first.', true);
+                return;
+              }
+
+              const routeRef = routesRef.push();
+              const routeName = file.name.replace(/\.[^/.]+$/, "") || 'Unnamed Route';
+
+              routeRef.set({
+                name: routeName,
+                points: points,
+                createdAt: Date.now()
+              }).then(() => {
+                showToast('✅ Route "' + routeName + '" uploaded and activated!');
+                database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
+                  .then(() => {
+                    showToast('🗺️ Route activated on map!');
+                  })
+                  .catch((err) => {
+                    showToast('⚠️ Route saved but activation failed: ' + err.message, true);
+                  });
+                renderRouteDropdown();
+                renderRouteList();
+              }).catch((err) => {
+                showToast('❌ Upload failed: ' + err.message, true);
+              });
+            });
+          } catch (err) {
+            showToast('❌ Error parsing GPX: ' + err.message, true);
+          }
         };
+
+        reader.onerror = function() {
+          showToast('❌ Failed to read file.', true);
+        };
+
         reader.readAsText(file);
+      }
+
+      // ===== PRE‑MADE ROUTES =====
+      function uploadPremadeRoute(file) {
+        if (!file) {
+          showToast('Please select a GPX file.', true);
+          return;
+        }
+        if (myUserId !== PROGRAMMER_ID) {
+          showToast('Only the programmer can upload pre‑made routes.', true);
+          return;
+        }
+
+        showToast('⏳ Uploading pre‑made route...', false);
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const gpxText = e.target.result;
+            const points = parseGPX(gpxText);
+
+            if (points.length < 2) {
+              showToast('Invalid GPX file or no track points.', true);
+              return;
+            }
+
+            const premadeRef = database.ref('premadeRoutes').push();
+            const routeName = file.name.replace(/\.[^/.]+$/, "") || 'Unnamed Pre‑made';
+
+            premadeRef.set({
+              name: routeName,
+              points: points,
+              createdAt: Date.now(),
+              uploadedBy: myUserId
+            }).then(() => {
+              showToast('✅ Pre‑made route "' + routeName + '" uploaded!');
+              updateAdminPanel();
+            }).catch((err) => {
+              showToast('❌ Upload failed: ' + err.message, true);
+            });
+          } catch (err) {
+            showToast('❌ Error parsing GPX: ' + err.message, true);
+          }
+        };
+
+        reader.onerror = function() {
+          showToast('❌ Failed to read file.', true);
+        };
+
+        reader.readAsText(file);
+      }
+
+      function deletePremadeRoute(routeId, routeName) {
+        if (myUserId !== PROGRAMMER_ID) {
+          showToast('Only the programmer can delete pre‑made routes.', true);
+          return;
+        }
+        if (!confirm(`Delete pre‑made route "${routeName}"?`)) return;
+        database.ref('premadeRoutes/' + routeId).remove()
+          .then(() => {
+            showToast(`🗑️ Pre‑made route "${routeName}" deleted.`);
+            updateAdminPanel();
+          })
+          .catch((err) => {
+            showToast('❌ Delete failed: ' + err.message, true);
+          });
+      }
+
+      function importPremadeRoute(routeId, routeName) {
+        if (!isLeader || teamCode === 'openworld') {
+          showToast('Only team leaders can import pre‑made routes.', true);
+          return;
+        }
+        // Check if team already has 5 routes
+        const routesRef = database.ref('teams/' + teamCode + '/savedRoutes');
+        routesRef.once('value').then((snap) => {
+          if (snap.numChildren() >= 5) {
+            showToast('⚠️ Your team already has 5 routes. Delete one first.', true);
+            return;
+          }
+          // Fetch the premade route
+          database.ref('premadeRoutes/' + routeId).once('value').then((snap) => {
+            const route = snap.val();
+            if (!route || !route.points || route.points.length < 2) {
+              showToast('Invalid pre‑made route.', true);
+              return;
+            }
+            // Copy to team's savedRoutes
+            const newRouteRef = routesRef.push();
+            newRouteRef.set({
+              name: routeName + ' (pre-made)',
+              points: route.points,
+              createdAt: Date.now(),
+              importedFrom: routeId
+            }).then(() => {
+              showToast(`✅ Pre‑made route "${routeName}" imported to your team!`);
+              // Activate it immediately
+              database.ref('teams/' + teamCode + '/activeRouteId').set(newRouteRef.key)
+                .catch(() => showToast('⚠️ Route imported but activation failed.', true));
+              renderRouteDropdown();
+              renderRouteList();
+            }).catch((err) => {
+              showToast('❌ Import failed: ' + err.message, true);
+            });
+          });
+        });
       }
 
       function leaveTeam() {
@@ -1463,7 +1630,6 @@
             }
           });
 
-          // My Trail layer
           map.addSource(MY_TRAIL_SOURCE, {
             type: 'geojson',
             data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
@@ -1583,7 +1749,7 @@
         }
       }
 
-      // ===== COMPASS (orientation only when tracking) =====
+      // ===== COMPASS =====
       let isOrientationActive = false;
       let lastCompassBearing = 0;
 
@@ -1598,7 +1764,6 @@
         if (alpha !== null && !isNaN(alpha)) {
           isOrientationActive = true;
           lastCompassBearing = 360 - alpha;
-          // Only rotate if tracking is active
           if (isTracking) {
             updateMapBearing(lastCompassBearing);
           }
@@ -1660,7 +1825,6 @@
 
       function updateTeamList() {
         const members = [];
-        // Self is not shown on map, but we still show it in the sidebar list
         if (myLastPosition) {
           members.push({
             id: myUserId,
@@ -1716,7 +1880,7 @@
         updateAdminPanel();
       }
 
-      // ===== ROUTES =====
+      // ===== ROUTE UI (team routes) =====
       let activeRouteId = null;
 
       function renderRouteDropdown() {
@@ -1780,13 +1944,15 @@
                 if (activeRouteId === id) {
                   database.ref('teams/' + teamCode + '/activeRouteId').set(null);
                 }
+                renderRouteDropdown();
+                renderRouteList();
               }).catch(() => showToast('❌ Delete failed.', true));
             };
           });
         });
       }
 
-      // ===== ADMIN PANEL =====
+      // ===== ADMIN PANEL (with pre-made routes) =====
       function updateAdminPanel() {
         if (!teamCode) {
           $adminPanel.style.display = 'none';
@@ -1805,8 +1971,9 @@
         }
 
         if (isLeader) {
-          $adminPanel.style.display = 'block';
+          let html = `<div class="admin-title">👑 Team Admin</div>`;
 
+          // Team code display
           let codeDisplay = 'Loading...';
           database.ref('teamCodes').orderByChild('teamCode').equalTo(teamCode).once('value').then((snap) => {
             let foundCode = '';
@@ -1816,19 +1983,12 @@
               if (el) el.textContent = foundCode;
             }
           });
-
-          database.ref('teams/' + teamCode + '/activeRouteId').on('value', (snap) => {
-            activeRouteId = snap.val();
-            renderRouteDropdown();
-            renderRouteList();
-          });
-
-          let html = `<div class="admin-title">👑 Team Admin</div>`;
           html += `<div style="background:var(--card);padding:6px 10px;border-radius:8px;margin-bottom:8px;text-align:center;">
             <span style="color:var(--text-secondary);font-size:0.55rem;">🔑 Team Code</span><br>
             <span id="teamCodeDisplay" style="font-size:1.6rem;font-weight:bold;color:var(--accent2);letter-spacing:4px;">${codeDisplay}</span>
           </div>`;
 
+          // Team route management
           html += `<div class="route-controls">
             <label>📂 Upload GPX (max 5)</label>
             <input type="file" id="gpxFileInput" accept=".gpx">
@@ -1843,6 +2003,33 @@
             <div id="routeListItems"></div>
           </div>`;
 
+          // ---- PRE‑MADE ROUTES SECTION (for all leaders) ----
+          html += `<div class="premade-section">
+            <div class="premade-title">📦 Pre‑made Routes</div>
+            <div style="margin-top:4px;">
+              <label style="font-size:0.6rem;color:var(--text-secondary);">Import a pre‑made route:</label>
+              <select id="premadeSelector" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:16px;font-size:0.65rem;outline:none;font-family:inherit;">
+                <option value="">-- Select --</option>
+              </select>
+              <button id="importPremadeBtn" class="btn btn-outline btn-sm" style="width:100%;margin-top:3px;">⬇️ Import to Team</button>
+            </div>
+            <div id="premadeList" style="margin-top:4px;font-size:0.6rem;color:var(--text-secondary);"></div>
+          </div>`;
+
+          // ---- PROGRAMMER CONTROLS (only if myUserId === PROGRAMMER_ID) ----
+          if (myUserId === PROGRAMMER_ID) {
+            html += `<div class="premade-section" style="border-top-color:var(--danger);">
+              <div class="premade-title" style="color:var(--danger);">🔧 Programmer – Manage Pre‑made Routes</div>
+              <div class="route-controls">
+                <label style="font-size:0.6rem;">📂 Upload Pre‑made GPX</label>
+                <input type="file" id="premadeFileInput" accept=".gpx">
+                <button id="uploadPremadeBtn" class="btn btn-danger-outline btn-sm" style="width:100%;margin-top:3px;">⬆️ Upload Pre‑made</button>
+              </div>
+              <div id="premadeManageList" style="margin-top:4px;"></div>
+            </div>`;
+          }
+
+          // Member list with kick buttons
           const members = [];
           for (const uid in remoteUsers) {
             const u = remoteUsers[uid];
@@ -1860,14 +2047,27 @@
             html += `</div>`;
           }
           html += `<div style="margin-top:8px;"><button id="deleteTeamBtn" class="btn btn-danger btn-sm" style="width:100%;border:1px solid var(--danger);color:var(--danger);background:transparent;border-radius:20px;padding:6px;">🗑️ Delete Team</button></div>`;
+
           $adminPanel.innerHTML = html;
 
+          // ---- Attach events ----
+          // Team route upload
           const uploadBtn = document.getElementById('uploadRouteBtn');
           const fileInput = document.getElementById('gpxFileInput');
           if (uploadBtn && fileInput) {
-            uploadBtn.onclick = function() { uploadRoute(fileInput.files[0]); };
+            const newBtn = uploadBtn.cloneNode(true);
+            uploadBtn.parentNode.replaceChild(newBtn, uploadBtn);
+            newBtn.onclick = function() {
+              const input = document.getElementById('gpxFileInput');
+              if (input && input.files && input.files[0]) {
+                uploadRoute(input.files[0]);
+              } else {
+                showToast('Please select a GPX file first.', true);
+              }
+            };
           }
 
+          // Team route selector
           const selector = document.getElementById('routeSelector');
           if (selector) {
             selector.onchange = function() {
@@ -1875,6 +2075,83 @@
             };
           }
 
+          // Pre-made route import
+          const premadeSelector = document.getElementById('premadeSelector');
+          const importBtn = document.getElementById('importPremadeBtn');
+          if (premadeSelector && importBtn) {
+            // Populate premade selector
+            database.ref('premadeRoutes').once('value').then((snap) => {
+              const routes = snap.val();
+              premadeSelector.innerHTML = '<option value="">-- Select --</option>';
+              if (routes) {
+                Object.keys(routes).forEach(id => {
+                  const route = routes[id];
+                  const opt = document.createElement('option');
+                  opt.value = id;
+                  opt.textContent = route.name || 'Unnamed';
+                  premadeSelector.appendChild(opt);
+                });
+              }
+            });
+            importBtn.onclick = function() {
+              const id = premadeSelector.value;
+              if (!id) {
+                showToast('Please select a pre‑made route.', true);
+                return;
+              }
+              const name = premadeSelector.options[premadeSelector.selectedIndex]?.text || 'Route';
+              importPremadeRoute(id, name);
+            };
+          }
+
+          // Programmer controls
+          if (myUserId === PROGRAMMER_ID) {
+            const premadeFileInput = document.getElementById('premadeFileInput');
+            const uploadPremadeBtn = document.getElementById('uploadPremadeBtn');
+            if (uploadPremadeBtn && premadeFileInput) {
+              const newBtn = uploadPremadeBtn.cloneNode(true);
+              uploadPremadeBtn.parentNode.replaceChild(newBtn, uploadPremadeBtn);
+              newBtn.onclick = function() {
+                const input = document.getElementById('premadeFileInput');
+                if (input && input.files && input.files[0]) {
+                  uploadPremadeRoute(input.files[0]);
+                } else {
+                  showToast('Please select a GPX file.', true);
+                }
+              };
+            }
+
+            // List pre-made routes with delete buttons
+            const manageList = document.getElementById('premadeManageList');
+            if (manageList) {
+              database.ref('premadeRoutes').on('value', (snap) => {
+                const routes = snap.val();
+                if (!routes) {
+                  manageList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.6rem;">No pre‑made routes.</div>';
+                  return;
+                }
+                let html = '';
+                Object.keys(routes).forEach(id => {
+                  const route = routes[id];
+                  html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--border);">
+                    <span style="font-size:0.65rem;">${escapeHtml(route.name || 'Unnamed')}</span>
+                    <button class="delete-premade-btn" data-id="${id}" data-name="${escapeHtml(route.name || 'Unnamed')}" style="background:transparent;border:1px solid var(--danger);color:var(--danger);padding:1px 6px;border-radius:8px;font-size:0.5rem;cursor:pointer;">Delete</button>
+                  </div>`;
+                });
+                manageList.innerHTML = html;
+                manageList.querySelectorAll('.delete-premade-btn').forEach(btn => {
+                  btn.onclick = function(e) {
+                    e.stopPropagation();
+                    const id = this.dataset.id;
+                    const name = this.dataset.name;
+                    deletePremadeRoute(id, name);
+                  };
+                });
+              });
+            }
+          }
+
+          // Kick buttons
           $adminPanel.querySelectorAll('.admin-btn').forEach(btn => {
             btn.onclick = (e) => {
               e.stopPropagation();
@@ -1883,10 +2160,12 @@
           });
           document.getElementById('deleteTeamBtn')?.addEventListener('click', deleteTeam);
 
+          // Refresh route dropdown/list
           renderRouteDropdown();
           renderRouteList();
 
         } else {
+          // Regular member view
           $adminPanel.style.display = 'block';
           $adminPanel.innerHTML = `
             <div style="border-top:1px solid var(--border);padding-top:10px;">
@@ -1959,7 +2238,6 @@
         updateTeamList();
         broadcastMyPosition();
 
-        // 🔒 Lock map to North when stopped
         if (map) {
           map.setBearing(0);
         }
