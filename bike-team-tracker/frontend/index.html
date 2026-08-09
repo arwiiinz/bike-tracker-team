@@ -733,6 +733,9 @@
       // ---- 🔥 FIX: Prevent duplicate team creation ----
       let isCreatingTeam = false;
 
+      // ---- Track previous leaderId to avoid unnecessary admin panel rebuilds ----
+      let previousLeaderId = null;
+
       // DOM refs
       const $sidebar = document.getElementById('sidebar');
       const $sidebarTitle = document.getElementById('sidebarTitle');
@@ -1049,6 +1052,7 @@
           if (snapshot.key === myUserId) return;
           if (snapshot.key === '_meta') {
             const meta = snapshot.val();
+            previousLeaderId = meta.leaderId;
             if (meta && meta.leaderId === myUserId) {
               isLeader = true;
               localStorage.setItem('biketeam_isLeader', 'true');
@@ -1070,14 +1074,19 @@
           if (snapshot.key === myUserId) return;
           if (snapshot.key === '_meta') {
             const meta = snapshot.val();
-            if (meta && meta.leaderId === myUserId) {
-              isLeader = true;
-              localStorage.setItem('biketeam_isLeader', 'true');
-            } else {
-              isLeader = false;
-              localStorage.removeItem('biketeam_isLeader');
+            // Only rebuild admin panel if the leaderId changed
+            if (meta.leaderId !== previousLeaderId) {
+              previousLeaderId = meta.leaderId;
+              if (meta && meta.leaderId === myUserId) {
+                isLeader = true;
+                localStorage.setItem('biketeam_isLeader', 'true');
+              } else {
+                isLeader = false;
+                localStorage.removeItem('biketeam_isLeader');
+              }
+              updateAdminPanel();
             }
-            updateAdminPanel();
+            // If only lastActivity changed, we ignore it
             return;
           }
           if (remoteUsers[snapshot.key]) {
@@ -1098,7 +1107,6 @@
             localStorage.removeItem('biketeam_teamcode');
             localStorage.removeItem('biketeam_isLeader');
             if (teamCleanupInterval) clearInterval(teamCleanupInterval);
-            // reload after a short delay to ensure cleanup
             setTimeout(() => location.reload(), 500);
             return;
           }
@@ -1670,7 +1678,6 @@
           localStorage.removeItem('biketeam_teamcode');
           localStorage.removeItem('biketeam_isLeader');
           if (teamCleanupInterval) clearInterval(teamCleanupInterval);
-          // Force reload after a delay to let Firebase sync
           setTimeout(() => {
             window.location.href = window.location.href;
           }, 500);
@@ -2084,7 +2091,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: ADMIN PANEL – stable, rebuilt only on _meta change
+      // 🔥 FIXED: ADMIN PANEL – stable, rebuilt only on leader change
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
