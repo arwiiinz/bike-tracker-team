@@ -722,7 +722,8 @@
       let routeSourceId = null;
       let routeLayerId = null;
       let activeRouteId = null;
-      let startMarker = null;
+      let startMarker = null;        // For manually set start point (leader)
+      let routeStartMarker = null;   // For flag at first point of active route
 
       // ---- MY OWN MARKER ----
       let myMarker = null;
@@ -1157,6 +1158,7 @@
           activeRouteRef.on('value', (snapshot) => {
             const newActiveId = snapshot.val();
 
+            // Remove old route line and flag marker
             if (routeLayerId && map) {
               try {
                 if (map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
@@ -1164,6 +1166,12 @@
               } catch (e) {}
               routeLayerId = null;
               routeSourceId = null;
+            }
+
+            // Remove route start flag marker
+            if (routeStartMarker) {
+              routeStartMarker.remove();
+              routeStartMarker = null;
             }
 
             activeRouteId = newActiveId;
@@ -1177,11 +1185,12 @@
             database.ref('teams/' + teamCode + '/savedRoutes/' + newActiveId).once('value').then((snap) => {
               const route = snap.val();
               if (route && route.points && route.points.length > 1 && map && mapInitialized) {
+                const coords = route.points.map(p => [p[1], p[0]]);
                 const geojson = {
                   type: 'Feature',
                   geometry: {
                     type: 'LineString',
-                    coordinates: route.points.map(p => [p[1], p[0]])
+                    coordinates: coords
                   }
                 };
                 const sourceId = 'route-source-' + newActiveId;
@@ -1202,7 +1211,22 @@
                       'line-opacity': 0.8
                     }
                   });
-                  showToast(`🗺️ Route "${route.name || 'Route'}" loaded.`);
+
+                  // ✅ Add flag marker at first point of the route
+                  const firstPoint = route.points[0];
+                  if (firstPoint && firstPoint.length === 2) {
+                    const el = document.createElement('div');
+                    el.className = 'start-flag-marker';
+                    el.textContent = '🚩';
+                    routeStartMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+                      .setLngLat([firstPoint[1], firstPoint[0]])
+                      .addTo(map);
+                    const popup = new maplibregl.Popup({ offset: [0, -10] })
+                      .setHTML('<b>🏁 Route Start</b>');
+                    routeStartMarker.setPopup(popup);
+                  }
+
+                  showToast(`🗺️ Route "${route.name || 'Route'}" loaded with start flag.`);
                 } catch (e) {
                   showToast('⚠️ Error drawing route: ' + e.message, true);
                 }
@@ -1213,6 +1237,7 @@
           const startRef = database.ref('teams/' + teamCode + '/startPoint');
           startRef.on('value', (snapshot) => {
             const startData = snapshot.val();
+            // Remove existing start marker (manual) if any
             if (startMarker) {
               startMarker.remove();
               startMarker = null;
@@ -1225,9 +1250,9 @@
                 .setLngLat([startData.lng, startData.lat])
                 .addTo(map);
               const popup = new maplibregl.Popup({ offset: [0, -10] })
-                .setHTML('<b>🏁 Start Point</b>');
+                .setHTML('<b>🏁 Start Point (manual)</b>');
               startMarker.setPopup(popup);
-              showToast('📍 Start point set!');
+              showToast('📍 Start point set manually!');
             }
           });
         }
@@ -1607,7 +1632,7 @@
       }
 
       // ============================================================
-      // SET START POINT
+      // SET START POINT (manual leader set)
       // ============================================================
       function setStartPoint() {
         if (!isLeader) {
@@ -1628,7 +1653,7 @@
           const startData = { lat: firstPoint[0], lng: firstPoint[1] };
           database.ref('teams/' + teamCode + '/startPoint').set(startData)
             .then(() => {
-              showToast('🏁 Start point set at the beginning of the route.');
+              showToast('🏁 Start point set at the beginning of the route (manual).');
               myLastPosition = {
                 lat: firstPoint[0],
                 lng: firstPoint[1],
@@ -2146,7 +2171,7 @@
 
           // ---- START POINT CONTROLS ----
           html += `<div class="start-controls">
-            <label>🏁 Start Point</label>
+            <label>🏁 Start Point (manual)</label>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
               <button id="setStartBtn" class="btn btn-outline btn-sm" style="flex:1;">Set Start</button>
               <button id="clearStartBtn" class="btn btn-danger btn-sm" style="flex:1; border-color:var(--danger);color:var(--danger);">Clear Start</button>
@@ -2201,7 +2226,7 @@
             });
           }
 
-          // 3. Start point buttons
+          // 3. Start point buttons (manual)
           const setStartBtn = document.getElementById('setStartBtn');
           if (setStartBtn) {
             const newSet = setStartBtn.cloneNode(true);
