@@ -798,7 +798,6 @@
       // 🔥 FIXED: TEAM CREATION WITH DUPLICATE GUARD
       // ============================================================
       async function createTeam() {
-        // Prevent multiple simultaneous calls
         if (isCreatingTeam) {
           showToast('⏳ Already creating a team, please wait...', true);
           return false;
@@ -811,7 +810,6 @@
           const trimmed = teamName.trim();
           if (!trimmed) { showToast('Team name cannot be empty.', true); return false; }
 
-          // Check if name already exists
           try {
             const nameSnap = await database.ref('teams')
               .orderByChild('_meta/teamName')
@@ -827,7 +825,6 @@
             return false;
           }
 
-          // Generate unique 4-digit code
           let code = '';
           let attempts = 0;
           while (attempts < 50) {
@@ -1018,8 +1015,7 @@
 
         setupFirebaseListeners();
         updateTeamList();
-        // ✅ Build admin panel once at startup
-        updateAdminPanel();
+        updateAdminPanel(); // build once at startup
 
         setInterval(updateMyStats, 1000);
         showToast(`🔑 Team: ${teamCode}`);
@@ -1060,7 +1056,7 @@
               isLeader = false;
               localStorage.removeItem('biketeam_isLeader');
             }
-            updateAdminPanel();   // ✅ rebuild only when leader changes
+            updateAdminPanel();
             return;
           }
           remoteUsers[snapshot.key] = snapshot.val();
@@ -1081,7 +1077,7 @@
               isLeader = false;
               localStorage.removeItem('biketeam_isLeader');
             }
-            updateAdminPanel();   // ✅ rebuild only when leader changes
+            updateAdminPanel();
             return;
           }
           if (remoteUsers[snapshot.key]) {
@@ -1102,7 +1098,8 @@
             localStorage.removeItem('biketeam_teamcode');
             localStorage.removeItem('biketeam_isLeader');
             if (teamCleanupInterval) clearInterval(teamCleanupInterval);
-            location.reload();
+            // reload after a short delay to ensure cleanup
+            setTimeout(() => location.reload(), 500);
             return;
           }
           if (remoteUsers[uid]) {
@@ -1529,7 +1526,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: ROUTE UPLOAD – Robust and reliable
+      // 🔥 FIXED: ROUTE UPLOAD – now with better error handling
       // ============================================================
       function uploadRoute(file) {
         if (!file) {
@@ -1569,7 +1566,8 @@
                 points: points,
                 createdAt: Date.now()
               }).then(() => {
-                showToast('✅ Route "' + routeName + '" uploaded and activated!');
+                showToast('✅ Route "' + routeName + '" uploaded!');
+                // Activate this route
                 database.ref('teams/' + teamCode + '/activeRouteId').set(routeRef.key)
                   .then(() => {
                     showToast('🗺️ Route activated on map!');
@@ -1581,7 +1579,7 @@
                 renderRouteDropdown();
                 renderRouteList();
 
-                // 🔥 Clear the file input so the user can upload the same file again
+                // Clear the file input so the user can upload the same file again
                 const fileInput = document.getElementById('gpxFileInput');
                 if (fileInput) fileInput.value = '';
               }).catch((err) => {
@@ -1672,7 +1670,10 @@
           localStorage.removeItem('biketeam_teamcode');
           localStorage.removeItem('biketeam_isLeader');
           if (teamCleanupInterval) clearInterval(teamCleanupInterval);
-          location.reload();
+          // Force reload after a delay to let Firebase sync
+          setTimeout(() => {
+            window.location.href = window.location.href;
+          }, 500);
         }).catch((e) => {
           showToast('❌ Error leaving: ' + e.message, true);
         });
@@ -2009,7 +2010,7 @@
             `;
           }).join('');
         }
-        // ❌ removed updateAdminPanel() to avoid rebuilding the admin panel on every position update
+        // ✅ No updateAdminPanel() here – panel is stable
       }
 
       // ===== ROUTE UI =====
@@ -2083,7 +2084,7 @@
       }
 
       // ============================================================
-      // 🔥 FIXED: ADMIN PANEL – built once and only rebuilt on _meta change
+      // 🔥 FIXED: ADMIN PANEL – stable, rebuilt only on _meta change
       // ============================================================
       function updateAdminPanel() {
         if (!teamCode) {
